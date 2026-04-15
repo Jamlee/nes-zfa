@@ -25,6 +25,7 @@ rm -rf "$SCRIPT_DIR/out"
 "$SCRIPT_DIR/build.sh" dmg-avalonia --release --no-rom
 "$SCRIPT_DIR/build.sh" apk --release --no-rom
 "$SCRIPT_DIR/build.sh" apk-avalonia --release --no-rom
+"$SCRIPT_DIR/build.sh" exe-avalonia
 
 echo ""
 echo "╔══════════════════════════════════════╗"
