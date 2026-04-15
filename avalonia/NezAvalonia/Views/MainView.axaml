@@ -1,0 +1,90 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NezAvalonia.ViewModels"
+             xmlns:views="using:NezAvalonia.Views"
+             x:Class="NezAvalonia.Views.MainView"
+             Background="#0A0A0F"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.DataContext>
+        <vm:MainViewModel/>
+    </UserControl.DataContext>
+
+    <Panel>
+        <!-- Main shell -->
+        <Panel IsVisible="{Binding !IsInGameplay}">
+            <Grid ColumnDefinitions="220,*" Name="DesktopLayout">
+                <!-- Sidebar -->
+                <Border Grid.Column="0" Background="#0A0A0F"
+                        BorderBrush="#1A1A2E" BorderThickness="0,0,1,0">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Top" Margin="24,28,24,24">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Border Width="36" Height="36" CornerRadius="10"
+                                        Background="#6C5CE7" Opacity="0.15">
+                                    <TextBlock Text="N" FontSize="18" FontWeight="Bold"
+                                               Foreground="#6C5CE7"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Nez" FontSize="22" FontWeight="Bold"
+                                               Foreground="#6C5CE7"/>
+                                    <TextBlock Text="NES Emulator" FontSize="10"
+                                               Foreground="#555577" Margin="0,-1,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <TextBlock DockPanel.Dock="Top" Text="BROWSE" FontSize="10"
+                                   Foreground="#555577" Margin="24,8,24,10"
+                                   LetterSpacing="3" FontWeight="SemiBold"/>
+
+                        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="12,0">
+                            <Button Name="NavLibrary" Classes="sidebar-item"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Click="OnNavLibrary">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <PathIcon Data="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
+                                              Foreground="#A29BFE" Width="18" Height="18"/>
+                                    <TextBlock Text="Games" VerticalAlignment="Center" FontSize="14"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Name="NavSettings" Classes="sidebar-item"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Click="OnNavSettings">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <PathIcon Data="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                                              Foreground="#A29BFE" Width="18" Height="18"/>
+                                    <TextBlock Text="Settings" VerticalAlignment="Center" FontSize="14"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel DockPanel.Dock="Bottom" Margin="24,0,24,20">
+                            <Border Height="1" Background="#1A1A2E" Margin="0,0,0,16"/>
+                            <TextBlock Text="v0.1.0" FontSize="10" Foreground="#555577"/>
+                        </StackPanel>
+                        <Panel/>
+                    </DockPanel>
+                </Border>
+
+                <!-- Content -->
+                <Panel Grid.Column="1">
+                    <views:LibraryView Name="LibraryPage"
+                                        DataContext="{Binding LibraryVm}"/>
+                    <views:SettingsView Name="SettingsPage"
+                                         DataContext="{Binding SettingsVm}"
+                                         IsVisible="False"/>
+                </Panel>
+            </Grid>
+        </Panel>
+
+        <!-- Gameplay -->
+        <views:GameplayView Name="GameplayPage"
+                             IsVisible="{Binding $parent[views:MainView].((vm:MainViewModel)DataContext).IsInGameplay}"
+                             DataContext="{Binding GameplayVm}"/>
+    </Panel>
+</UserControl>

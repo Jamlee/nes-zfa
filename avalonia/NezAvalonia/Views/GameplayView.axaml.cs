@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using NezAvalonia.ViewModels;
 
 namespace NezAvalonia.Views;
@@ -102,8 +103,18 @@ public partial class GameplayView : UserControl
         if (Vm != null)
             Vm.Engine.FrameReady -= OnFrameReady;
 
-        var mainWindow = TopLevel.GetTopLevel(this) as MainWindow;
-        mainWindow?.ExitGameplay();
+        FindMainView()?.ExitGameplay();
+    }
+
+    private MainView? FindMainView()
+    {
+        Avalonia.Visual? v = this;
+        while (v != null)
+        {
+            if (v is MainView mv) return mv;
+            v = v.GetVisualParent();
+        }
+        return null;
     }
 
     private void OnTogglePause(object? sender, RoutedEventArgs e)

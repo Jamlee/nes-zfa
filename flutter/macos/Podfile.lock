@@ -24,6 +24,6 @@ SPEC CHECKSUMS:
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
-PODFILE CHECKSUM: b3ec7f16f7dfcf84a7b207061fac95562e5fed02
+PODFILE CHECKSUM: ae0d42cb29cf62b4cbcfde601c63a4dfe0d5c7c6
 
 COCOAPODS: 1.16.2

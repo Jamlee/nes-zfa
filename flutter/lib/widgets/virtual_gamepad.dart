@@ -12,32 +12,64 @@ typedef TurboCallback = void Function(bool active);
 /// Virtual gamepad overlay for mobile gameplay.
 class VirtualGamepad extends StatelessWidget {
   final ButtonCallback onButton;
-  final TurboCallback onTurboA;
-  final TurboCallback onTurboB;
+  final TurboCallback? onTurboA;
+  final TurboCallback? onTurboB;
+  final bool _joystickOnly;
+  final bool _buttonsOnly;
 
   const VirtualGamepad({
     super.key,
     required this.onButton,
-    required this.onTurboA,
-    required this.onTurboB,
-  });
+    required TurboCallback this.onTurboA,
+    required TurboCallback this.onTurboB,
+  })  : _joystickOnly = false,
+        _buttonsOnly = false;
+
+  /// Only show joystick (for landscape left side).
+  const VirtualGamepad.joystickOnly({
+    super.key,
+    required this.onButton,
+  })  : onTurboA = null,
+        onTurboB = null,
+        _joystickOnly = true,
+        _buttonsOnly = false;
+
+  /// Only show action buttons (for landscape right side).
+  const VirtualGamepad.buttonsOnly({
+    super.key,
+    required this.onButton,
+    required TurboCallback this.onTurboA,
+    required TurboCallback this.onTurboB,
+  })  : _joystickOnly = false,
+        _buttonsOnly = true;
 
   @override
   Widget build(BuildContext context) {
+    if (_joystickOnly) {
+      return Center(child: _Joystick(onDirection: onButton));
+    }
+    if (_buttonsOnly) {
+      return Center(
+        child: _ActionButtons(
+          onButton: onButton,
+          onTurboA: onTurboA!,
+          onTurboB: onTurboB!,
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // D-Pad + Action buttons row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _Joystick(onDirection: onButton),
               _ActionButtons(
                 onButton: onButton,
-                onTurboA: onTurboA,
-                onTurboB: onTurboB,
+                onTurboA: onTurboA!,
+                onTurboB: onTurboB!,
               ),
             ],
           ),

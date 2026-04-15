@@ -370,7 +370,7 @@
 			name = "[CP-User] Copy Nez Emulator Library";
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "      NEZ_DIR=\"${SRCROOT}/../../nez\"\n      DYLIB=\"${NEZ_DIR}/zig-out/lib/libnez_emu.dylib\"\n      DEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS\"\n\n      if [ ! -f \"$DYLIB\" ]; then\n        echo \"warning: libnez_emu.dylib not found at $DYLIB — building...\"\n        cd \"$NEZ_DIR\" && zig build lib -Doptimize=ReleaseFast 2>&1 || true\n      fi\n\n      if [ -f \"$DYLIB\" ]; then\n        cp -f \"$DYLIB\" \"$DEST/libnez_emu.dylib\"\n        codesign --force --sign - \"$DEST/libnez_emu.dylib\" 2>/dev/null || true\n        echo \"Copied libnez_emu.dylib → $DEST/\"\n      else\n        echo \"error: libnez_emu.dylib not found, emulator will not work\"\n      fi\n";
+			shellScript = "      NEZ_DIR=\"${SRCROOT}/../../lib\"\n      DYLIB=\"${NEZ_DIR}/zig-out/lib/libnez_emu.dylib\"\n      DEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS\"\n\n      if [ ! -f \"$DYLIB\" ]; then\n        echo \"warning: libnez_emu.dylib not found at $DYLIB — building...\"\n        cd \"$NEZ_DIR\" && zig build lib -Doptimize=ReleaseFast 2>&1 || true\n      fi\n\n      if [ -f \"$DYLIB\" ]; then\n        cp -f \"$DYLIB\" \"$DEST/libnez_emu.dylib\"\n        codesign --force --sign - \"$DEST/libnez_emu.dylib\" 2>/dev/null || true\n        echo \"Copied libnez_emu.dylib → $DEST/\"\n      else\n        echo \"error: libnez_emu.dylib not found, emulator will not work\"\n      fi\n";
 		};
 		709F5B7BE89696A5AC341CD8 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;

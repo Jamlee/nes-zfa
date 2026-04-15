@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using NezAvalonia.Views;
 
 namespace NezAvalonia;
 
@@ -16,6 +17,11 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow();
+        }
+        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+        {
+            // Android: use UserControl, not Window
+            singleView.MainView = new MainView();
         }
 
         base.OnFrameworkInitializationCompleted();

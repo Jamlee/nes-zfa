@@ -1,12 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace NezAvalonia.Core;
 
@@ -37,13 +43,19 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     private volatile byte _buttonState;
 
     // Audio
-    private NezAudioPlayer? _audioPlayer;
+    private INezAudioPlayer? _audioPlayer;
     private IntPtr _audioBuffer;
     private const int AudioBufferSize = 2048;
 
     // Double-buffer: emu thread writes to _backBuffer, then swaps pointer
     private byte[]? _backBuffer; // BGRA32 pixel data
     private volatile bool _frameReady;
+
+    // GIF recording
+    private volatile bool _recording;
+    private readonly List<byte[]> _recordedFrames = new();
+    private const int MaxRecordFrames = 300; // ~5 seconds
+    private int _recordFrameCounter;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action? FrameReady;
@@ -53,6 +65,7 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     public bool IsRunning => _isRunning;
     public string? LoadError => _loadError;
     public int Fps => _fps;
+    public bool IsRecording => _recording;
 
     public int ScreenWidth => (int)NezBindings.ScreenWidth();
     public int ScreenHeight => (int)NezBindings.ScreenHeight();
@@ -108,7 +121,7 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
         _isRunning = true;
 
         // Start audio
-        _audioPlayer = new NezAudioPlayer();
+        _audioPlayer = NezAudioFactory.Create();
         _audioPlayer.Start();
         _audioBuffer = Marshal.AllocHGlobal(AudioBufferSize * 2);
 
@@ -260,6 +273,18 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
                 dst[di + 3] = 255;         // A
             }
         }
+
+        // Capture frame for GIF recording (every other frame)
+        if (_recording && _recordedFrames.Count < MaxRecordFrames)
+        {
+            _recordFrameCounter++;
+            if (_recordFrameCounter % 2 == 0)
+            {
+                var copy = new byte[_backBuffer.Length];
+                Buffer.BlockCopy(_backBuffer, 0, copy, 0, _backBuffer.Length);
+                lock (_recordedFrames) { _recordedFrames.Add(copy); }
+            }
+        }
     }
 
     private void DrainAudio()
@@ -291,6 +316,60 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     private void OnPropertyChanged(string name)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    // ---- GIF Recording ----
+
+    public void StartRecording()
+    {
+        lock (_recordedFrames) { _recordedFrames.Clear(); }
+        _recordFrameCounter = 0;
+        _recording = true;
+        OnPropertyChanged(nameof(IsRecording));
+    }
+
+    public async Task<string?> StopRecording()
+    {
+        _recording = false;
+        OnPropertyChanged(nameof(IsRecording));
+
+        List<byte[]> frames;
+        lock (_recordedFrames)
+        {
+            frames = new List<byte[]>(_recordedFrames);
+            _recordedFrames.Clear();
+        }
+        if (frames.Count == 0) return null;
+
+        int w = ScreenWidth, h = ScreenHeight;
+        return await Task.Run(() => EncodeGif(w, h, frames));
+    }
+
+    private static string? EncodeGif(int w, int h, List<byte[]> frames)
+    {
+        try
+        {
+            using var gif = new Image<Bgra32>(w, h);
+            gif.Frames.RemoveFrame(0);
+
+            foreach (var bgra in frames)
+            {
+                using var frame = SixLabors.ImageSharp.Image.LoadPixelData<Bgra32>(bgra, w, h);
+                var meta = frame.Frames.RootFrame.Metadata.GetGifMetadata();
+                meta.FrameDelay = 3; // ~30fps
+                gif.Frames.AddFrame(frame.Frames.RootFrame);
+            }
+
+            gif.Metadata.GetGifMetadata().RepeatCount = 0;
+
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"nez_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.gif");
+            gif.SaveAsGif(path);
+            return path;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public void Dispose()

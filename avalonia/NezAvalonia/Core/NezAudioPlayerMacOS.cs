@@ -1,3 +1,4 @@
+#if !ANDROID
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -6,10 +7,9 @@ namespace NezAvalonia.Core;
 
 /// <summary>
 /// Audio player using macOS AudioToolbox (AudioQueue) via P/Invoke.
-/// Uses Float32 PCM format at 44100 Hz mono — same as Flutter's AVAudioEngine approach.
-/// Int16 samples from emulator are converted to Float32 before queuing.
+/// Uses Float32 PCM format at 44100 Hz mono.
 /// </summary>
-public sealed class NezAudioPlayer : IDisposable
+public sealed class NezAudioPlayerMacOS : INezAudioPlayer
 {
     private const int SampleRate = 44100;
     private const int NumBuffers = 3;
@@ -45,7 +45,7 @@ public sealed class NezAudioPlayer : IDisposable
         public uint mPacketDescriptionCount;
     }
 
-    public NezAudioPlayer()
+    public NezAudioPlayerMacOS()
     {
         _callbackDelegate = OnCallback;
         _callbackHandle = GCHandle.Alloc(_callbackDelegate);
@@ -206,3 +206,4 @@ public sealed class NezAudioPlayer : IDisposable
     [DllImport("/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox")]
     private static extern int AudioQueueSetParameter(IntPtr aq, uint paramID, float value);
 }
+#endif

@@ -18,18 +18,21 @@ Nez — NES Emulator
 
 Usage: ./build.sh <command> [--release]
 
-  flutter         Build lib + run Flutter macOS app
-  avalonia        Build lib + run Avalonia macOS app
-  android         Build lib + run Flutter on Android
-  apk             Build Android APK
-  lib             Build Zig shared library only
-  clean           Clean all build artifacts
-  check           Check toolchain versions
+  flutter             Build lib + run Flutter macOS app
+  avalonia            Build lib + run Avalonia macOS app
+  android             Build lib + run Flutter on Android
+  android-avalonia    Build lib + run Avalonia on Android
+  apk                 Build Flutter Android APK
+  apk-avalonia        Build Avalonia Android APK
+  lib                 Build Zig shared library only
+  clean               Clean all build artifacts
+  check               Check toolchain versions
 
 Examples:
   ./build.sh flutter
   ./build.sh avalonia
   ./build.sh apk --release
+  ./build.sh apk-avalonia --release
 USAGE
 }
 
@@ -60,16 +63,12 @@ copy_dylib_avalonia() {
 }
 
 build_android_so() {
-    local so="$FLUTTER_DIR/android/app/src/main/jniLibs/arm64-v8a/libnez_emu.so"
-    [ -f "$so" ] && [ "$so" -nt "$LIB_DIR/src/ffi.zig" ] && return
-
     info "Cross-compiling for Android arm64..."
     cd "$LIB_DIR"
     local ndk=""
     if [ -n "$ANDROID_NDK_HOME" ]; then
         ndk="$ANDROID_NDK_HOME"
     else
-        # Pick NDK with a working darwin sysroot
         for d in ~/Library/Android/sdk/ndk/*/; do
             if [ -d "${d}toolchains/llvm/prebuilt/darwin-x86_64/sysroot" ]; then
                 ndk="${d%/}"
@@ -90,9 +89,23 @@ gcc_dir=
 LIBC
     zig build-lib src/ffi.zig -OReleaseFast -target aarch64-linux-android \
         --libc /tmp/nez-android-libc.conf -lc -dynamic --name nez_emu
+    ok "Android .so compiled"
+}
+
+copy_so_flutter() {
+    local so="$FLUTTER_DIR/android/app/src/main/jniLibs/arm64-v8a/libnez_emu.so"
     mkdir -p "$(dirname "$so")"
-    mv libnez_emu.so "$so"; rm -f libnez_emu.so.o
-    ok "Android .so ready"
+    cp -f "$LIB_DIR/libnez_emu.so" "$so"
+    rm -f "$LIB_DIR/libnez_emu.so" "$LIB_DIR/libnez_emu.so.o"
+    ok "Copied .so → Flutter jniLibs/"
+}
+
+copy_so_avalonia() {
+    local dest="$AVALONIA_DIR/lib/arm64-v8a/libnez_emu.so"
+    mkdir -p "$(dirname "$dest")"
+    cp -f "$LIB_DIR/libnez_emu.so" "$dest"
+    rm -f "$LIB_DIR/libnez_emu.so" "$LIB_DIR/libnez_emu.so.o"
+    ok "Copied .so → Avalonia lib/arm64-v8a/"
 }
 
 # ---- Commands ----
@@ -111,21 +124,46 @@ cmd_avalonia() {
     check_tools; command -v dotnet >/dev/null 2>&1 || fail "dotnet not found"
     build_lib; copy_dylib_avalonia
     info "Running Avalonia macOS..."
-    cd "$AVALONIA_DIR" && dotnet run
+    cd "$AVALONIA_DIR" && dotnet run -f net10.0
 }
 
 cmd_android() {
     check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
-    build_android_so
+    build_android_so; copy_so_flutter
     cd "$FLUTTER_DIR" && flutter pub get && flutter run -d android
+}
+
+cmd_android_avalonia() {
+    check_tools; command -v dotnet >/dev/null 2>&1 || fail "dotnet not found"
+    build_android_so; copy_so_avalonia
+    info "Running Avalonia Android..."
+    cd "$AVALONIA_DIR" && dotnet run -f net10.0-android
 }
 
 cmd_apk() {
     local mode="${1:-debug}"
     check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
-    build_android_so
+    build_android_so; copy_so_flutter
+    info "Building Flutter APK ($mode)..."
     cd "$FLUTTER_DIR" && flutter pub get && flutter build apk --"$mode"
-    ok "APK: $FLUTTER_DIR/build/app/outputs/flutter-apk/app-$mode.apk"
+    local apk="$FLUTTER_DIR/build/app/outputs/flutter-apk/app-$mode.apk"
+    ok "Flutter APK: $apk ($(du -h "$apk" | awk '{print $1}'))"
+}
+
+cmd_apk_avalonia() {
+    local mode="${1:-debug}"
+    check_tools; command -v dotnet >/dev/null 2>&1 || fail "dotnet not found"
+    build_android_so; copy_so_avalonia
+    info "Building Avalonia APK ($mode)..."
+    cd "$AVALONIA_DIR"
+    if [ "$mode" = "release" ]; then
+        dotnet publish -f net10.0-android -c Release
+        local apk="$AVALONIA_DIR/bin/Release/net10.0-android/publish/com.nez.nez_avalonia-Signed.apk"
+    else
+        dotnet publish -f net10.0-android -c Debug
+        local apk="$AVALONIA_DIR/bin/Debug/net10.0-android/publish/com.nez.nez_avalonia-Signed.apk"
+    fi
+    [ -f "$apk" ] && ok "Avalonia APK: $apk ($(du -h "$apk" | awk '{print $1}'))" || fail "APK not found"
 }
 
 cmd_clean() {
@@ -134,6 +172,7 @@ cmd_clean() {
     (cd "$FLUTTER_DIR" && flutter clean 2>/dev/null || true)
     (cd "$AVALONIA_DIR" && dotnet clean 2>/dev/null && rm -f libnez_emu.* || true)
     rm -rf "$FLUTTER_DIR/android/app/src/main/jniLibs"
+    rm -rf "$AVALONIA_DIR/lib/arm64-v8a"
     ok "Done"
 }
 
@@ -145,12 +184,14 @@ done
 MODE="debug"; $RELEASE && MODE="release"
 
 case "${CMD:-flutter}" in
-    flutter)   cmd_flutter ;;
-    avalonia)  cmd_avalonia ;;
-    android)   cmd_android ;;
-    apk)       cmd_apk "$MODE" ;;
-    lib)       check_tools; build_lib ;;
-    clean)     cmd_clean ;;
-    check)     check_tools ;;
-    *)         usage; exit 1 ;;
+    flutter)           cmd_flutter ;;
+    avalonia)          cmd_avalonia ;;
+    android)           cmd_android ;;
+    android-avalonia)  cmd_android_avalonia ;;
+    apk)               cmd_apk "$MODE" ;;
+    apk-avalonia)      cmd_apk_avalonia "$MODE" ;;
+    lib)               check_tools; build_lib ;;
+    clean)             cmd_clean ;;
+    check)             check_tools ;;
+    *)                 usage; exit 1 ;;
 esac

@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using NezAvalonia.ViewModels;
 
 namespace NezAvalonia.Views;
@@ -77,8 +78,18 @@ public partial class LibraryView : UserControl
         if (e.Source is Button btn && btn.Tag is RomEntry rom && rom.Exists)
         {
             Vm?.UpdateLastPlayed(rom);
-            var mainWindow = TopLevel.GetTopLevel(this) as MainWindow;
-            mainWindow?.LaunchGame(rom.Path, rom.Name);
+            FindMainView()?.LaunchGame(rom.Path, rom.Name);
         }
+    }
+
+    private MainView? FindMainView()
+    {
+        Avalonia.Visual? v = this;
+        while (v != null)
+        {
+            if (v is MainView mv) return mv;
+            v = v.GetVisualParent();
+        }
+        return null;
     }
 }

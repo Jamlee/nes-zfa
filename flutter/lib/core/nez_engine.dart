@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
 
 import 'nez_bindings.dart';
 
@@ -34,9 +35,14 @@ class NezEngine extends ChangeNotifier {
   // Audio
   static const _audioChannel = MethodChannel('com.nez/audio');
   bool _audioStarted = false;
-  // Pre-allocate native buffer for audio drain (enough for ~1 frame of audio)
   final Pointer<Int16> _audioBuffer = malloc.allocate<Int16>(2048 * 2);
   static const _audioBufferSize = 2048;
+
+  // GIF recording
+  bool _recording = false;
+  final List<Uint8List> _recordedFrames = [];
+  static const _maxRecordFrames = 300; // ~5 seconds at 60fps
+  Uint8List? _lastRgba; // keep last converted frame for recording
 
   // Callbacks
   VoidCallback? onFrameReady;
@@ -49,6 +55,7 @@ class NezEngine extends ChangeNotifier {
   int get fps => _fps;
   bool get isPaused => _emu?.isPaused ?? true;
   String? get loadError => _loadError;
+  bool get isRecording => _recording;
 
   int get screenWidth => isRunning ? _emu!.screenWidth : 256;
   int get screenHeight => isRunning ? _emu!.screenHeight : 240;
@@ -172,6 +179,21 @@ class NezEngine extends ChangeNotifier {
       rgba[i * 4 + 3] = 255; // A
     }
 
+    // Capture frame for GIF recording (every other frame to reduce size)
+    if (_recording && _recordedFrames.length < _maxRecordFrames) {
+      if (_frameCount % 2 == 0) {
+        _recordedFrames.add(Uint8List.fromList(rgba));
+      }
+    }
+    _lastRgba = rgba;
+
+    for (int i = 0; i < w * h; i++) {
+      rgba[i * 4 + 0] = fb[i * 3 + 0]; // R
+      rgba[i * 4 + 1] = fb[i * 3 + 1]; // G
+      rgba[i * 4 + 2] = fb[i * 3 + 2]; // B
+      rgba[i * 4 + 3] = 255; // A
+    }
+
     ui.decodeImageFromPixels(
       rgba,
       w,
@@ -211,6 +233,29 @@ class NezEngine extends ChangeNotifier {
   // ---- Debug ----
   int get cpuPc => _emu?.cpuPc ?? 0;
 
+  // ---- GIF Recording ----
+
+  void startRecording() {
+    _recordedFrames.clear();
+    _recording = true;
+    notifyListeners();
+  }
+
+  /// Stop recording and encode to GIF. Returns file path or null.
+  Future<String?> stopRecording() async {
+    _recording = false;
+    notifyListeners();
+    if (_recordedFrames.isEmpty) return null;
+
+    final w = screenWidth;
+    final h = screenHeight;
+    final frames = List<Uint8List>.from(_recordedFrames);
+    _recordedFrames.clear();
+
+    // Encode in background isolate
+    return compute(_encodeGifIsolate, _GifParams(w, h, frames));
+  }
+
   /// Stop and clean up.
   @override
   void dispose() {
@@ -220,5 +265,39 @@ class NezEngine extends ChangeNotifier {
     _emu?.dispose();
     malloc.free(_audioBuffer);
     super.dispose();
+  }
+}
+
+class _GifParams {
+  final int w, h;
+  final List<Uint8List> frames;
+  _GifParams(this.w, this.h, this.frames);
+}
+
+String? _encodeGifIsolate(_GifParams p) {
+  try {
+    final firstFrame = img.Image(width: p.w, height: p.h);
+    for (int i = 0; i < p.w * p.h; i++) {
+      final rgba = p.frames[0];
+      firstFrame.setPixelRgba(i % p.w, i ~/ p.w, rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2], rgba[i * 4 + 3]);
+    }
+    firstFrame.frameDuration = 33;
+
+    for (int f = 1; f < p.frames.length; f++) {
+      final frame = img.Image(width: p.w, height: p.h);
+      final rgba = p.frames[f];
+      for (int i = 0; i < p.w * p.h; i++) {
+        frame.setPixelRgba(i % p.w, i ~/ p.w, rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2], rgba[i * 4 + 3]);
+      }
+      frame.frameDuration = 33;
+      firstFrame.frames.add(frame);
+    }
+
+    final encoded = img.encodeGif(firstFrame);
+    final path = '${Directory.systemTemp.path}/nez_${DateTime.now().millisecondsSinceEpoch}.gif';
+    File(path).writeAsBytesSync(encoded);
+    return path;
+  } catch (_) {
+    return null;
   }
 }

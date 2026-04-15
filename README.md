@@ -2,11 +2,16 @@
 
 NES emulator with Zig core and multiple UI frontends.
 
+<div style="display: flex; gap: 10px;">
+    <img src="./lib/screens/megaman_gameplay.gif" alt="Megaman" width="256px"/>
+    <img src="./lib/screens/tetris.gif" alt="Tetris" width="256px"/>
+</div>
+
 ```
-nezf/
 ├── lib/          Zig emulator core (CPU, PPU, APU, mappers)
 ├── flutter/      Flutter UI (macOS, Android)
-├── avalonia/     Avalonia UI (macOS, Windows, Linux)
+├── avalonia/     Avalonia UI (macOS, Windows, Linux, Android)
+├── roms/         ROM files (place .nes here)
 ├── build.sh      Build script
 └── design.html   Interactive design mockup
 ```
@@ -14,14 +19,12 @@ nezf/
 ## Quick Start
 
 ```bash
-# Flutter (macOS)
-./build.sh flutter
-
-# Avalonia (macOS/Windows/Linux)
-./build.sh avalonia
-
-# Android APK
-./build.sh apk
+./build.sh flutter       # Flutter macOS
+./build.sh avalonia       # Avalonia macOS
+./build.sh apk            # Flutter Android APK
+./build.sh apk-avalonia   # Avalonia Android APK
+./build.sh lib            # Zig shared library only
+./build.sh clean          # Clean all
 ```
 
 ## Prerequisites
@@ -32,19 +35,6 @@ nezf/
 | Flutter | [Flutter](https://flutter.dev) 3.x, Xcode (macOS) |
 | Avalonia | [.NET](https://dotnet.microsoft.com) 10+ |
 | Android | Android SDK + NDK |
-
-## Build Commands
-
-```bash
-./build.sh flutter      # Build lib + run Flutter macOS
-./build.sh avalonia      # Build lib + run Avalonia
-./build.sh android       # Build lib + run Flutter Android
-./build.sh apk           # Build Android APK
-./build.sh apk --release # Release APK
-./build.sh lib           # Build Zig shared library only
-./build.sh clean         # Clean all artifacts
-./build.sh check         # Check toolchain
-```
 
 ## Architecture
 
@@ -66,7 +56,7 @@ The Zig core compiles to `libnez_emu.dylib` / `.so` / `.dll`, exposing C functio
 ## Controls
 
 ### Mobile
-Virtual joystick + A/B + Turbo A/B buttons.
+Virtual joystick + A/B + Turbo A/B buttons. Landscape mode: joystick left, game center, buttons right.
 
 ### Desktop
 
@@ -77,14 +67,48 @@ Virtual joystick + A/B + Turbo A/B buttons.
 | Turbo A / B | U / I |
 | Start / Select | Enter / X |
 | Pause | Space |
+| Record GIF | ⌘R |
 | Debug | ⌘D |
 | Back | Esc |
 
-## Supported Mappers
+## Features
+
+- GIF recording (toolbar button or ⌘R)
+- ROM library with persistence
+- Virtual gamepad with turbo buttons
+- Debug panel (CPU registers, PPU status)
+- Audio output (macOS)
+- Adaptive layout (portrait/landscape)
+
+## Emulator Roadmap
+
+- [x] CPU: Ricoh 2A03 (cycle-accurate 6502)
+- [x] PPU: Ricoh 2C02 (scanline renderer)
+- [x] Vertical scrolling
+- [x] Horizontal scrolling
+- [x] Split scrolling
+- [x] Sprite zero hit
+- [x] Controller input
+- [ ] APU: Full audio support (2/5 channels implemented)
+- [ ] Sprite overflow detection
+- **Mappers:**
+  - [x] NROM (Mapper 0)
+  - [x] MMC1 (Mapper 1) — some minor bugs remain
+  - [x] UxROM (Mapper 2)
+  - [ ] CNROM (Mapper 3)
+  - [ ] MMC3 (Mapper 4)
+  - [ ] MMC5 (Mapper 5)
+
+## Supported Games
 
 - **NROM** — Donkey Kong, Pac-Man, Super Mario Bros
-- **MMC1** — Mega Man, Zelda
+- **MMC1** — Mega Man, Legend of Zelda
 - **UxROM** — Contra, Castlevania, Jackal
+
+## Credits
+
+Emulator core based on [nez](https://github.com/) — a Zig NES emulator by the original author.
+UI frontends and FFI bridge by this project.
 
 ## License
 
