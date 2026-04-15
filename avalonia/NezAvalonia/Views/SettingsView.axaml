@@ -1,0 +1,148 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NezAvalonia.ViewModels"
+             x:Class="NezAvalonia.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <ScrollViewer Padding="28,24">
+        <StackPanel Spacing="28" MaxWidth="560">
+            <TextBlock Text="Settings" FontSize="24" FontWeight="Bold" Foreground="#F0F0F5"/>
+
+            <!-- DISPLAY -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="DISPLAY" FontSize="10" Foreground="#555577"
+                           LetterSpacing="3" FontWeight="SemiBold"/>
+                <Border Classes="card">
+                    <StackPanel Spacing="18">
+                        <DockPanel>
+                            <TextBlock Text="Aspect Ratio" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                            <ComboBox DockPanel.Dock="Right"
+                                      ItemsSource="{x:Static vm:SettingsViewModel.AspectRatioOptions}"
+                                      SelectedItem="{Binding AspectRatio}"
+                                      HorizontalAlignment="Right" MinWidth="160"/>
+                        </DockPanel>
+                        <Border Height="1" Background="#1A1A2E"/>
+                        <DockPanel>
+                            <TextBlock Text="Pixel Filter" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                            <ComboBox DockPanel.Dock="Right"
+                                      ItemsSource="{x:Static vm:SettingsViewModel.PixelFilterOptions}"
+                                      SelectedItem="{Binding PixelFilter}"
+                                      HorizontalAlignment="Right" MinWidth="160"/>
+                        </DockPanel>
+                        <Border Height="1" Background="#1A1A2E"/>
+                        <DockPanel>
+                            <TextBlock Text="Show FPS" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                            <ToggleSwitch DockPanel.Dock="Right"
+                                          IsChecked="{Binding ShowFps}"
+                                          HorizontalAlignment="Right"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- AUDIO -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="AUDIO" FontSize="10" Foreground="#555577"
+                           LetterSpacing="3" FontWeight="SemiBold"/>
+                <Border Classes="card">
+                    <StackPanel Spacing="18">
+                        <DockPanel>
+                            <TextBlock Text="Sound" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                            <ToggleSwitch DockPanel.Dock="Right"
+                                          IsChecked="{Binding SoundEnabled}"
+                                          HorizontalAlignment="Right"/>
+                        </DockPanel>
+                        <Border Height="1" Background="#1A1A2E"/>
+                        <DockPanel>
+                            <TextBlock Text="Volume" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"
+                                       DockPanel.Dock="Left"/>
+                            <TextBlock DockPanel.Dock="Right" FontSize="13"
+                                       Foreground="#8888AA" VerticalAlignment="Center"
+                                       HorizontalAlignment="Right" Width="44"
+                                       TextAlignment="Right">
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0:P0}">
+                                        <Binding Path="Volume"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="1"
+                                    Value="{Binding Volume}"
+                                    Margin="20,0"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- CONTROLS -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="CONTROLS" FontSize="10" Foreground="#555577"
+                           LetterSpacing="3" FontWeight="SemiBold"/>
+                <Border Classes="card">
+                    <StackPanel Spacing="18">
+                        <DockPanel>
+                            <TextBlock Text="Vibration" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                            <ToggleSwitch DockPanel.Dock="Right"
+                                          IsChecked="{Binding Vibration}"
+                                          HorizontalAlignment="Right"/>
+                        </DockPanel>
+                        <Border Height="1" Background="#1A1A2E"/>
+                        <DockPanel>
+                            <TextBlock Text="Button Size" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                            <ComboBox DockPanel.Dock="Right"
+                                      ItemsSource="{x:Static vm:SettingsViewModel.ButtonSizeOptions}"
+                                      SelectedItem="{Binding ButtonSize}"
+                                      HorizontalAlignment="Right" MinWidth="160"/>
+                        </DockPanel>
+                        <Border Height="1" Background="#1A1A2E"/>
+                        <DockPanel>
+                            <TextBlock Text="Button Opacity" FontSize="14"
+                                       Foreground="#F0F0F5" VerticalAlignment="Center"
+                                       DockPanel.Dock="Left"/>
+                            <TextBlock DockPanel.Dock="Right" FontSize="13"
+                                       Foreground="#8888AA" VerticalAlignment="Center"
+                                       HorizontalAlignment="Right" Width="44"
+                                       TextAlignment="Right">
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0:P0}">
+                                        <Binding Path="ButtonOpacity"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="1"
+                                    Value="{Binding ButtonOpacity}"
+                                    Margin="20,0"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ADVANCED -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="ADVANCED" FontSize="10" Foreground="#555577"
+                           LetterSpacing="3" FontWeight="SemiBold"/>
+                <Border Classes="card">
+                    <DockPanel>
+                        <TextBlock Text="Debug Mode" FontSize="14"
+                                   Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                        <ToggleSwitch DockPanel.Dock="Right"
+                                      IsChecked="{Binding DebugMode}"
+                                      HorizontalAlignment="Right"/>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+
+            <TextBlock Text="Nez v0.1.0 · Zig + Avalonia"
+                       FontSize="12" Foreground="#555577"
+                       HorizontalAlignment="Center"
+                       Margin="0,8,0,28"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

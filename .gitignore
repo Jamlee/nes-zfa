@@ -1,0 +1,56 @@
+# Zig build
+zig-out/
+.zig-cache/
+zig-cache/
+zig-pkg/
+
+# Native libs (built from source)
+*.dylib
+*.so
+*.dll
+*.a
+!lib/src/**
+
+# Flutter
+build/
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+flutter/macos/Pods/
+flutter/macos/.symlinks/
+flutter/macos/Flutter/ephemeral/
+
+# .NET / Avalonia
+bin/
+obj/
+*.user
+*.suo
+packages/
+
+# Android
+*.apk
+*.aab
+.gradle/
+flutter/android/app/src/main/jniLibs/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# ROMs
+*.nes
+rom/
+
+# Misc
+.claude/
+.env
+*.local
+*.mp4

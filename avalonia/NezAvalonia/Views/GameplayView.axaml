@@ -1,0 +1,130 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NezAvalonia.ViewModels"
+             xmlns:ctrl="using:NezAvalonia.Controls"
+             x:Class="NezAvalonia.Views.GameplayView"
+             x:DataType="vm:GameplayViewModel"
+             Focusable="True">
+
+    <Panel Background="#0A0A0F">
+        <!-- Error state -->
+        <StackPanel IsVisible="{Binding HasError}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center" Spacing="20">
+            <Border Width="72" Height="72" CornerRadius="18"
+                    Background="#1A0A0A" HorizontalAlignment="Center">
+                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+                          Foreground="#FF6B6B" Width="36" Height="36"/>
+            </Border>
+            <StackPanel Spacing="6" HorizontalAlignment="Center">
+                <TextBlock Text="Failed to load ROM" FontSize="18" FontWeight="SemiBold"
+                           Foreground="#FF6B6B" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding ErrorMessage}" FontSize="13"
+                           Foreground="#8888AA" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" MaxWidth="400"/>
+            </StackPanel>
+            <Button Click="OnBack" Classes="primary" HorizontalAlignment="Center" Margin="0,4,0,0">
+                <TextBlock Text="Back to Library" FontSize="14"/>
+            </Button>
+        </StackPanel>
+
+        <!-- Desktop gameplay layout -->
+        <DockPanel IsVisible="{Binding !HasError}">
+            <!-- Top toolbar -->
+            <Border DockPanel.Dock="Top" Background="#0A0A0F"
+                    BorderBrush="#1A1A2E" BorderThickness="0,0,0,1"
+                    Padding="14,0" Height="48">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="10"
+                                VerticalAlignment="Center">
+                        <Button Click="OnBack" Classes="ghost" Padding="8,6" CornerRadius="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="&#x2190;" FontSize="16" Foreground="#8888AA"/>
+                                <ctrl:KeyBadge Label="Esc"/>
+                            </StackPanel>
+                        </Button>
+                        <Border Width="1" Height="20" Background="#1A1A2E"/>
+                        <TextBlock Text="{Binding RomName}" FontSize="14"
+                                   Foreground="#F0F0F5" VerticalAlignment="Center"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                Spacing="6" VerticalAlignment="Center">
+                        <Button Click="OnTogglePause" Classes="toolbar">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="&#x23F8;" FontSize="12" Foreground="#A29BFE"/>
+                                <TextBlock Text="Pause" FontSize="12"/>
+                                <ctrl:KeyBadge Label="Space"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="OnToggleDebug" Classes="toolbar">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="&#x1F41B;" FontSize="11"/>
+                                <TextBlock Text="Debug" FontSize="12"/>
+                                <ctrl:KeyBadge Label="&#x2318;D"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <Panel/>
+                </DockPanel>
+            </Border>
+
+            <!-- Bottom: Keybindings bar -->
+            <Border DockPanel.Dock="Bottom" Background="#0A0A0F"
+                    BorderBrush="#1A1A2E" BorderThickness="0,1,0,0"
+                    Padding="16,8">
+                <WrapPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                    <ctrl:KeybindItem Keys="W,A,S,D" Label="Move" Margin="0,2,20,2"/>
+                    <Border Width="1" Height="14" Background="#1A1A2E" Margin="0,2,20,2"
+                            VerticalAlignment="Center"/>
+                    <ctrl:KeybindItem Keys="J" Label="A Button" Margin="0,2,12,2"/>
+                    <ctrl:KeybindItem Keys="K" Label="B Button" Margin="0,2,20,2"/>
+                    <Border Width="1" Height="14" Background="#1A1A2E" Margin="0,2,20,2"
+                            VerticalAlignment="Center"/>
+                    <ctrl:KeybindItem Keys="U" Label="Turbo A" Margin="0,2,12,2"/>
+                    <ctrl:KeybindItem Keys="I" Label="Turbo B" Margin="0,2,20,2"/>
+                    <Border Width="1" Height="14" Background="#1A1A2E" Margin="0,2,20,2"
+                            VerticalAlignment="Center"/>
+                    <ctrl:KeybindItem Keys="Enter" Label="Start" Margin="0,2,12,2"/>
+                    <ctrl:KeybindItem Keys="X" Label="Select" Margin="0,2,0,2"/>
+                </WrapPanel>
+            </Border>
+
+            <!-- Right: Debug panel -->
+            <Border DockPanel.Dock="Right"
+                    IsVisible="{Binding ShowDebugPanel}"
+                    Width="210" Background="#0E0E16"
+                    BorderBrush="#1A1A2E" BorderThickness="1,0,0,0"
+                    Padding="18,18">
+                <StackPanel Spacing="20">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="CPU REGISTERS" FontSize="10"
+                                   Foreground="#555577" LetterSpacing="3" FontWeight="SemiBold"/>
+                        <TextBlock FontSize="14" Foreground="#22D3EE"
+                                   FontFamily="Courier New" FontWeight="Bold"
+                                   Name="DebugPC"/>
+                    </StackPanel>
+
+                    <Border Height="1" Background="#1A1A2E"/>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="STATUS" FontSize="10"
+                                   Foreground="#555577" LetterSpacing="3" FontWeight="SemiBold"/>
+                        <TextBlock Name="DebugPaused" FontSize="13" Foreground="#8888AA"/>
+                        <TextBlock Name="DebugFps" FontSize="14" Foreground="#51CF66"
+                                   FontFamily="Courier New" FontWeight="Bold"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Center: NES Display -->
+            <Panel Background="#000000">
+                <ctrl:NesDisplay Name="Display"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+            </Panel>
+        </DockPanel>
+    </Panel>
+</UserControl>

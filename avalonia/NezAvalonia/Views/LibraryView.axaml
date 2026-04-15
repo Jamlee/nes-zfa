@@ -1,0 +1,131 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NezAvalonia.ViewModels"
+             x:Class="NezAvalonia.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel">
+
+    <DockPanel Margin="0">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="28,24,28,0">
+            <TextBlock DockPanel.Dock="Left" Text="Library" FontSize="24" FontWeight="Bold"
+                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right" Name="AddRomBtn" Classes="primary"
+                    VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="+" FontSize="18" FontWeight="Bold" Margin="0,-2,0,0"/>
+                    <TextBlock Text="Add ROM" FontSize="13" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Button>
+            <Panel/>
+        </DockPanel>
+
+        <!-- Search -->
+        <Border DockPanel.Dock="Top" Margin="28,18,28,0"
+                Background="#12121A" CornerRadius="12"
+                BorderBrush="#2A2A44" BorderThickness="1"
+                Padding="4,0">
+            <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0" Text="&#x1F50D;" FontSize="14"
+                           Foreground="#555577" VerticalAlignment="Center"
+                           Margin="12,0,0,0"/>
+                <TextBox Grid.Column="1" Text="{Binding SearchQuery}"
+                         PlaceholderText="Search ROMs..."
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Foreground="#F0F0F5"
+                         FontSize="14"
+                         Padding="8,10"/>
+            </Grid>
+        </Border>
+
+        <!-- Content -->
+        <Panel Margin="28,20,28,0">
+            <!-- Empty state -->
+            <StackPanel Name="EmptyState"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="20">
+                <Border Width="80" Height="80" CornerRadius="20"
+                        Background="#12121A"
+                        HorizontalAlignment="Center">
+                    <PathIcon Data="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                              Foreground="#555577" Width="36" Height="36"/>
+                </Border>
+                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                    <TextBlock Text="No ROMs loaded" FontSize="18" FontWeight="SemiBold"
+                               Foreground="#8888AA" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Add a .nes ROM file to get started" FontSize="13"
+                               Foreground="#555577" HorizontalAlignment="Center"/>
+                </StackPanel>
+                <Button Name="AddRomEmptyBtn" Classes="primary"
+                        HorizontalAlignment="Center" Margin="0,4,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="+" FontSize="18" FontWeight="Bold" Margin="0,-2,0,0"/>
+                        <TextBlock Text="Add ROM" FontSize="14" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- ROM grid -->
+            <ScrollViewer Name="RomGrid">
+                <ItemsControl ItemsSource="{Binding FilteredRoms}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RomEntry">
+                            <Button Width="200" Margin="0,0,14,14"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0" CornerRadius="14"
+                                    Cursor="Hand"
+                                    Tag="{Binding}">
+                                <Border Classes="game-card" ClipToBounds="True">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Top" Height="110"
+                                                Background="#12121A">
+                                            <Panel>
+                                                <!-- Subtle gradient overlay -->
+                                                <Border CornerRadius="14,14,0,0"
+                                                        Opacity="0.08">
+                                                    <Border.Background>
+                                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                                            <GradientStop Color="#6C5CE7" Offset="0"/>
+                                                            <GradientStop Color="#A29BFE" Offset="1"/>
+                                                        </LinearGradientBrush>
+                                                    </Border.Background>
+                                                </Border>
+                                                <PathIcon Data="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
+                                                          Foreground="#A29BFE"
+                                                          Opacity="0.25"
+                                                          Width="44" Height="44"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Panel>
+                                        </Border>
+                                        <StackPanel Margin="14,12" Spacing="5">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="14" FontWeight="SemiBold"
+                                                       Foreground="#F0F0F5"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding SizeText}"
+                                                       FontSize="12"
+                                                       Foreground="#8888AA"/>
+                                            <TextBlock Text="{Binding Path}"
+                                                       FontSize="10"
+                                                       Foreground="#555577"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Panel>
+    </DockPanel>
+</UserControl>

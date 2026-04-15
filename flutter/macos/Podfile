@@ -1,0 +1,64 @@
+platform :osx, '10.15'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'ephemeral', 'Flutter-Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure \"flutter pub get\" is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Flutter-Generated.xcconfig, then run \"flutter pub get\""
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_macos_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
+
+  # Auto-copy libnez_emu.dylib into the app bundle after build
+  script_phase :name => 'Copy Nez Emulator Library',
+    :script => <<-SCRIPT
+      NEZ_DIR="${SRCROOT}/../../lib"
+      DYLIB="${NEZ_DIR}/zig-out/lib/libnez_emu.dylib"
+      DEST="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS"
+
+      if [ ! -f "$DYLIB" ]; then
+        echo "warning: libnez_emu.dylib not found at $DYLIB — building..."
+        cd "$NEZ_DIR" && zig build lib -Doptimize=ReleaseFast 2>&1 || true
+      fi
+
+      if [ -f "$DYLIB" ]; then
+        cp -f "$DYLIB" "$DEST/libnez_emu.dylib"
+        codesign --force --sign - "$DEST/libnez_emu.dylib" 2>/dev/null || true
+        echo "Copied libnez_emu.dylib → $DEST/"
+      else
+        echo "error: libnez_emu.dylib not found, emulator will not work"
+      fi
+    SCRIPT
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_macos_build_settings(target)
+  end
+end

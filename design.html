@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nez Flutter UI Design</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-dark: #0a0a0f;
+    --bg-card: #12121a;
+    --bg-surface: #1a1a2e;
+    --bg-elevated: #222240;
+    --accent-primary: #6c5ce7;
+    --accent-secondary: #a29bfe;
+    --accent-glow: rgba(108, 92, 231, 0.3);
+    --accent-red: #ff6b6b;
+    --accent-green: #51cf66;
+    --accent-orange: #ffa94d;
+    --accent-cyan: #22d3ee;
+    --text-primary: #f0f0f5;
+    --text-secondary: #8888aa;
+    --text-dim: #555577;
+    --border: #2a2a44;
+    --nes-red: #e74c3c;
+    --nes-blue: #3498db;
+    --nes-gray: #2c3e50;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ===== Slide System ===== */
+  .presentation {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateX(60px);
+    transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+    padding: 40px 60px;
+  }
+
+  .slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .slide.prev {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+
+  /* ===== Navigation ===== */
+  .nav-bar {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(18, 18, 26, 0.9);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 8px 20px;
+    z-index: 100;
+  }
+
+  .nav-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .nav-dot.active {
+    background: var(--accent-primary);
+    box-shadow: 0 0 12px var(--accent-glow);
+    width: 28px;
+    border-radius: 5px;
+  }
+
+  .nav-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.2s;
+  }
+
+  .nav-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+
+  .slide-counter {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  /* ===== Slide 1: Cover ===== */
+  .cover-title {
+    font-size: 72px;
+    font-weight: 900;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe, #22d3ee);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+  }
+
+  .cover-subtitle {
+    font-size: 24px;
+    color: var(--text-secondary);
+    font-weight: 300;
+    margin-bottom: 40px;
+  }
+
+  .cover-badges {
+    display: flex;
+    gap: 12px;
+  }
+
+  .badge {
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .badge-flutter { background: rgba(2, 133, 255, 0.15); color: #54b5ff; border: 1px solid rgba(2, 133, 255, 0.3); }
+  .badge-android { background: rgba(61, 220, 132, 0.15); color: #3ddc84; border: 1px solid rgba(61, 220, 132, 0.3); }
+  .badge-macos { background: rgba(255, 255, 255, 0.08); color: #ccc; border: 1px solid rgba(255, 255, 255, 0.15); }
+
+  .cover-nes-art {
+    margin-top: 50px;
+    display: flex;
+    gap: 6px;
+    opacity: 0.4;
+  }
+
+  .pixel-block {
+    width: 8px; height: 8px;
+    border-radius: 1px;
+  }
+
+  /* ===== Slide 2: Architecture ===== */
+  .arch-container {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  .arch-diagram {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .arch-layer {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+  }
+
+  .arch-layer-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent-secondary);
+    margin-bottom: 12px;
+  }
+
+  .arch-boxes {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .arch-box {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .arch-box.ui { background: rgba(108, 92, 231, 0.2); color: var(--accent-secondary); border: 1px solid rgba(108, 92, 231, 0.3); }
+  .arch-box.core { background: rgba(255, 107, 107, 0.15); color: var(--accent-red); border: 1px solid rgba(255, 107, 107, 0.25); }
+  .arch-box.platform { background: rgba(34, 211, 238, 0.15); color: var(--accent-cyan); border: 1px solid rgba(34, 211, 238, 0.25); }
+  .arch-box.ffi { background: rgba(255, 169, 77, 0.15); color: var(--accent-orange); border: 1px solid rgba(255, 169, 77, 0.25); }
+
+  .arch-arrow {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 20px;
+    margin: -6px 0;
+  }
+
+  .arch-info {
+    flex: 0 0 300px;
+  }
+
+  .arch-info h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+
+  .arch-info-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .arch-info-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+
+  .arch-info-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* ===== Phone Mockup ===== */
+  .phone-frame {
+    width: 320px;
+    height: 640px;
+    background: #0d0d14;
+    border-radius: 36px;
+    border: 3px solid #333;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.05);
+    flex-shrink: 0;
+  }
+
+  .phone-notch {
+    width: 120px;
+    height: 26px;
+    background: #0d0d14;
+    border-radius: 0 0 16px 16px;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
+
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .phone-statusbar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  /* ===== Desktop Mockup ===== */
+  .desktop-frame {
+    width: 780px;
+    height: 500px;
+    background: #0d0d14;
+    border-radius: 12px;
+    border: 2px solid #333;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    flex-shrink: 0;
+  }
+
+  .desktop-titlebar {
+    height: 36px;
+    background: #1a1a28;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .titlebar-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+  }
+
+  .titlebar-dot.red { background: #ff5f57; }
+  .titlebar-dot.yellow { background: #febc2e; }
+  .titlebar-dot.green { background: #28c840; }
+
+  .titlebar-text {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  .desktop-content {
+    width: 100%;
+    height: calc(100% - 36px);
+    display: flex;
+  }
+
+  /* ===== Phone App Screens ===== */
+  /* Home / Library */
+  .app-home {
+    background: linear-gradient(180deg, #0f0f1a 0%, #0a0a12 100%);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-header {
+    padding: 0 20px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .app-logo {
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .app-icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 16px;
+  }
+
+  .search-bar {
+    margin: 0 20px 16px;
+    height: 40px;
+    background: var(--bg-surface);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 10px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    padding: 0 20px;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+  }
+
+  .recent-games {
+    padding: 0 20px;
+    display: flex;
+    gap: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .game-card-sm {
+    width: 100px;
+    flex-shrink: 0;
+  }
+
+  .game-thumb {
+    width: 100px;
+    height: 80px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .game-thumb::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 30px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.5));
+  }
+
+  .game-thumb.dk { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+  .game-thumb.pac { background: linear-gradient(135deg, #f39c12, #e67e22); }
+  .game-thumb.mm { background: linear-gradient(135deg, #3498db, #2980b9); }
+
+  .game-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .game-meta {
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+
+  .game-list {
+    flex: 1;
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .game-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .game-list-thumb {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .game-list-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .game-list-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .game-list-detail {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .game-list-play {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+  }
+
+  .bottom-nav {
+    height: 60px;
+    background: rgba(13, 13, 20, 0.95);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    border-top: 1px solid var(--border);
+    padding: 0 10px;
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .bottom-nav-item.active { color: var(--accent-primary); }
+
+  .bottom-nav-icon {
+    width: 22px; height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  /* ===== Phone Gameplay Screen ===== */
+  .gameplay-screen {
+    background: #000;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gameplay-topbar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(0,0,0,0.8);
+  }
+
+  .gameplay-back {
+    color: var(--accent-secondary);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .gameplay-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .gameplay-menu {
+    color: var(--text-secondary);
+    font-size: 18px;
+  }
+
+  .gameplay-viewport {
+    flex: 0 0 256px;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    margin: 4px 10px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .gameplay-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1a0a0a, #0a1a0a);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .pixel-art-mini {
+    display: grid;
+    grid-template-columns: repeat(16, 6px);
+    grid-template-rows: repeat(12, 6px);
+    gap: 1px;
+  }
+
+  .gameplay-fps {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-green);
+    background: rgba(0,0,0,0.6);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .gameplay-controls {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 20px;
+    gap: 10px;
+  }
+
+  .controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .dpad {
+    width: 110px;
+    height: 110px;
+    position: relative;
+  }
+
+  .dpad-btn {
+    position: absolute;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  .dpad-up { width: 36px; height: 36px; top: 0; left: 37px; }
+  .dpad-down { width: 36px; height: 36px; bottom: 0; left: 37px; }
+  .dpad-left { width: 36px; height: 36px; top: 37px; left: 0; }
+  .dpad-right { width: 36px; height: 36px; top: 37px; right: 0; }
+  .dpad-center { width: 36px; height: 36px; top: 37px; left: 37px; background: var(--bg-elevated); }
+
+  .action-btns {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .action-btn {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+  }
+
+  .btn-b { background: var(--accent-red); box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4); }
+  .btn-a { background: var(--accent-primary); box-shadow: 0 4px 12px rgba(108, 92, 231, 0.4); }
+
+  .btn-turbo-b {
+    background: transparent;
+    border: 2px solid var(--accent-red);
+    color: var(--accent-red);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.25);
+    position: relative;
+  }
+
+  .btn-turbo-a {
+    background: transparent;
+    border: 2px solid var(--accent-primary);
+    color: var(--accent-primary);
+    box-shadow: 0 0 10px rgba(108, 92, 231, 0.25);
+    position: relative;
+  }
+
+  .turbo-label {
+    font-size: 7px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    position: absolute;
+    top: 5px;
+    color: inherit;
+    opacity: 0.7;
+  }
+
+  .turbo-letter {
+    margin-top: 4px;
+  }
+
+  .action-btns-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+    align-items: center;
+    justify-items: center;
+  }
+
+  /* Joystick */
+  .joystick {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+  }
+
+  .joystick::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 1px dashed rgba(255,255,255,0.06);
+  }
+
+  .joystick-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #444466, #2a2a44);
+    border: 2px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+    transform: translate(6px, -4px);
+    position: relative;
+  }
+
+  .joystick-thumb::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.15), transparent);
+    top: 8px;
+    left: 12px;
+  }
+
+  .joystick-arrows {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    color: rgba(255,255,255,0.08);
+    font-size: 10px;
+  }
+
+  .joystick-arrows span {
+    position: absolute;
+  }
+
+  .joystick-arrows .j-up { top: 6px; left: 50%; transform: translateX(-50%); }
+  .joystick-arrows .j-down { bottom: 6px; left: 50%; transform: translateX(-50%); }
+  .joystick-arrows .j-left { left: 8px; top: 50%; transform: translateY(-50%); }
+  .joystick-arrows .j-right { right: 8px; top: 50%; transform: translateY(-50%); }
+
+  .system-btns {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .sys-btn {
+    padding: 6px 20px;
+    border-radius: 20px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  /* ===== Desktop Screens ===== */
+  .desktop-sidebar {
+    width: 200px;
+    background: #0f0f1a;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 0;
+  }
+
+  .sidebar-logo {
+    font-size: 20px;
+    font-weight: 800;
+    padding: 0 16px;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .sidebar-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0 16px;
+    margin-bottom: 8px;
+  }
+
+  .sidebar-item {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+
+  .sidebar-item.active {
+    color: var(--text-primary);
+    background: rgba(108, 92, 231, 0.12);
+    border-right: 2px solid var(--accent-primary);
+  }
+
+  .sidebar-item-icon {
+    width: 18px;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .desktop-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .desktop-toolbar {
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15, 15, 26, 0.8);
+  }
+
+  .toolbar-search {
+    flex: 1;
+    max-width: 300px;
+    height: 32px;
+    background: var(--bg-surface);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .toolbar-view-toggle {
+    display: flex;
+    gap: 4px;
+  }
+
+  .view-btn {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: transparent;
+  }
+
+  .view-btn.active { background: var(--bg-elevated); color: var(--text-primary); }
+
+  .desktop-grid {
+    flex: 1;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    overflow: hidden;
+    align-content: start;
+  }
+
+  .desktop-game-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .desktop-game-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+
+  .desktop-game-thumb {
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    position: relative;
+  }
+
+  .desktop-game-info {
+    padding: 10px 12px;
+  }
+
+  .desktop-game-name {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .desktop-game-detail {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* Desktop Gameplay */
+  .desktop-gameplay {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .desktop-gameplay-toolbar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    background: rgba(15, 15, 26, 0.9);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dgt-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+  }
+
+  .dgt-btn.primary { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-bottom-width: 2px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-dim);
+    line-height: 1;
+    letter-spacing: 0;
+  }
+
+  .dgt-btn .kbd {
+    margin-left: 2px;
+  }
+
+  .dgt-btn.primary .kbd {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* Keybindings bar */
+  .keybindings-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 6px 16px;
+    background: rgba(10, 10, 15, 0.9);
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .keybind-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .keybind-item .kbd {
+    font-size: 9px;
+  }
+
+  .keybind-sep {
+    width: 1px;
+    height: 14px;
+    background: var(--border);
+  }
+
+  .desktop-viewport-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    position: relative;
+  }
+
+  .desktop-viewport {
+    width: 512px;
+    height: 480px;
+    max-height: calc(100% - 20px);
+    background: linear-gradient(135deg, #0a0a0a, #111);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .desktop-viewport-label {
+    font-size: 16px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  .desktop-viewport-res {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 4px;
+  }
+
+  .desktop-fps {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-green);
+    background: rgba(0,0,0,0.7);
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  /* Debug Panel */
+  .desktop-debug-panel {
+    width: 200px;
+    background: #0d0d18;
+    border-left: 1px solid var(--border);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+  }
+
+  .debug-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent-secondary);
+    margin-bottom: 6px;
+  }
+
+  .debug-register {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 3px;
+  }
+
+  .debug-reg-name { color: var(--text-dim); }
+  .debug-reg-val { color: var(--accent-cyan); }
+
+  .debug-palette-row {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+
+  .debug-color-swatch {
+    width: 16px; height: 12px;
+    border-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .debug-pt-placeholder {
+    width: 100%;
+    aspect-ratio: 1;
+    background: var(--bg-surface);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* ===== Settings Phone Screen ===== */
+  .settings-screen {
+    background: linear-gradient(180deg, #0f0f1a 0%, #0a0a12 100%);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-header {
+    padding: 12px 20px;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .settings-group {
+    margin: 0 20px 16px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .settings-group-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 10px 14px 6px;
+  }
+
+  .settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .settings-item:last-child { border-bottom: none; }
+
+  .settings-label {
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+
+  .settings-value {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .toggle {
+    width: 40px; height: 22px;
+    border-radius: 11px;
+    position: relative;
+  }
+
+  .toggle.on { background: var(--accent-primary); }
+  .toggle.off { background: var(--bg-elevated); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+  }
+
+  .toggle.on::after { right: 2px; }
+  .toggle.off::after { left: 2px; }
+
+  /* ===== Slide titles ===== */
+  .slide-title {
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .slide-desc {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+    text-align: center;
+    max-width: 600px;
+  }
+
+  .mockup-row {
+    display: flex;
+    gap: 50px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .mockup-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 16px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .mockup-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ===== Slide 7: Tech Stack ===== */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  .tech-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.3s;
+  }
+
+  .tech-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-4px);
+  }
+
+  .tech-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+
+  .tech-name {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .tech-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* NES screen mock inside viewport */
+  .nes-screen-mock {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    position: relative;
+  }
+
+  .nes-mock-header {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .nes-mock-title {
+    color: var(--accent-red);
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 2px;
+    margin: 12px 0;
+  }
+
+  .nes-mock-platforms {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: 2px;
+    flex: 1;
+    padding: 4px;
+  }
+
+  .nes-px {
+    border-radius: 1px;
+  }
+
+  /* Color theme chips */
+  .color-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .color-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .color-swatch {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+
+  .color-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .feature-list {
+    list-style: none;
+    max-width: 700px;
+    width: 100%;
+  }
+
+  .feature-list li {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+    color: var(--text-secondary);
+  }
+
+  .feature-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .feature-icon.purple { background: rgba(108,92,231,0.2); }
+  .feature-icon.red { background: rgba(255,107,107,0.2); }
+  .feature-icon.cyan { background: rgba(34,211,238,0.2); }
+  .feature-icon.green { background: rgba(81,207,102,0.2); }
+  .feature-icon.orange { background: rgba(255,169,77,0.2); }
+</style>
+</head>
+<body>
+
+<div class="presentation" id="presentation">
+
+  <!-- ===== SLIDE 1: Cover ===== -->
+  <div class="slide active" data-slide="0">
+    <div class="cover-nes-art">
+      <script>
+        // Generate pixel art
+      </script>
+    </div>
+    <div class="cover-title">Nez</div>
+    <div class="cover-subtitle">NES Emulator - Flutter UI Redesign</div>
+    <div class="cover-badges">
+      <span class="badge badge-flutter">Flutter 3.x</span>
+      <span class="badge badge-android">Android</span>
+      <span class="badge badge-macos">macOS</span>
+    </div>
+    <div style="margin-top: 50px; color: var(--text-dim); font-size: 13px;">
+      Zig Core via dart:ffi &bull; Material 3 &bull; Adaptive Layout
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 2: Architecture ===== -->
+  <div class="slide" data-slide="1">
+    <div style="margin-bottom: 20px;">
+      <div class="slide-title">Architecture</div>
+      <div class="slide-desc">Flutter Shell + Zig Emulator Core via FFI</div>
+    </div>
+    <div class="arch-container">
+      <div class="arch-diagram">
+        <div class="arch-layer">
+          <div class="arch-layer-title">UI Layer (Flutter / Dart)</div>
+          <div class="arch-boxes">
+            <span class="arch-box ui">GameScreen</span>
+            <span class="arch-box ui">LibraryView</span>
+            <span class="arch-box ui">SettingsView</span>
+            <span class="arch-box ui">DebugPanel</span>
+            <span class="arch-box ui">VirtualGamepad</span>
+          </div>
+        </div>
+        <div class="arch-arrow">&darr;</div>
+        <div class="arch-layer">
+          <div class="arch-layer-title">Bridge Layer (dart:ffi)</div>
+          <div class="arch-boxes">
+            <span class="arch-box ffi">NezBindings</span>
+            <span class="arch-box ffi">FrameBuffer</span>
+            <span class="arch-box ffi">AudioBridge</span>
+            <span class="arch-box ffi">InputBridge</span>
+          </div>
+        </div>
+        <div class="arch-arrow">&darr;</div>
+        <div class="arch-layer">
+          <div class="arch-layer-title">Emulator Core (Zig / C ABI)</div>
+          <div class="arch-boxes">
+            <span class="arch-box core">CPU (6502)</span>
+            <span class="arch-box core">PPU (2C02)</span>
+            <span class="arch-box core">APU</span>
+            <span class="arch-box core">Bus</span>
+            <span class="arch-box core">Mappers</span>
+          </div>
+        </div>
+        <div class="arch-arrow">&darr;</div>
+        <div class="arch-layer">
+          <div class="arch-layer-title">Platform</div>
+          <div class="arch-boxes">
+            <span class="arch-box platform">Android NDK</span>
+            <span class="arch-box platform">macOS dylib</span>
+            <span class="arch-box platform">File I/O</span>
+          </div>
+        </div>
+      </div>
+      <div class="arch-info">
+        <h2>Key Decisions</h2>
+        <div class="arch-info-item">
+          <div class="arch-info-dot" style="background: var(--accent-primary)"></div>
+          <div class="arch-info-text"><strong>dart:ffi</strong> - Zig compile to C ABI shared library, Flutter calls via FFI. Zero overhead.</div>
+        </div>
+        <div class="arch-info-item">
+          <div class="arch-info-dot" style="background: var(--accent-red)"></div>
+          <div class="arch-info-text"><strong>Texture Widget</strong> - Render NES frame buffer directly to Flutter Texture for 60fps.</div>
+        </div>
+        <div class="arch-info-item">
+          <div class="arch-info-dot" style="background: var(--accent-cyan)"></div>
+          <div class="arch-info-text"><strong>Isolate</strong> - Emulation loop runs on a separate Dart Isolate to avoid UI jank.</div>
+        </div>
+        <div class="arch-info-item">
+          <div class="arch-info-dot" style="background: var(--accent-orange)"></div>
+          <div class="arch-info-text"><strong>Adaptive UI</strong> - Single codebase, responsive for phone & desktop.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 3: Mobile - Home ===== -->
+  <div class="slide" data-slide="2">
+    <div class="slide-title">Mobile - Game Library</div>
+    <div class="slide-desc">Android phone home screen with ROM library management</div>
+    <div class="mockup-row">
+      <div class="mockup-wrapper">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <span style="display:flex;gap:4px;font-size:10px;">
+                <span>&#9679;&#9679;&#9679;&#9679;</span>
+                <span>&#128267;</span>
+              </span>
+            </div>
+            <div class="app-home">
+              <div class="app-header">
+                <span class="app-logo">Nez</span>
+                <div style="display:flex;gap:8px;">
+                  <div class="app-icon-btn">+</div>
+                  <div class="app-icon-btn">&#9881;</div>
+                </div>
+              </div>
+
+              <div class="search-bar">
+                <span>&#128269;</span>
+                <span>Search ROMs...</span>
+              </div>
+
+              <div class="section-title">&#9889; Recently Played</div>
+              <div class="recent-games">
+                <div class="game-card-sm">
+                  <div class="game-thumb dk">&#127918;</div>
+                  <div class="game-name">Donkey Kong</div>
+                  <div class="game-meta">2 min ago</div>
+                </div>
+                <div class="game-card-sm">
+                  <div class="game-thumb pac">&#128123;</div>
+                  <div class="game-name">Pac-Man</div>
+                  <div class="game-meta">Yesterday</div>
+                </div>
+                <div class="game-card-sm">
+                  <div class="game-thumb mm">&#129302;</div>
+                  <div class="game-name">Mega Man</div>
+                  <div class="game-meta">3 days ago</div>
+                </div>
+              </div>
+
+              <div class="section-title">&#128194; All Games</div>
+              <div class="game-list">
+                <div class="game-list-item">
+                  <div class="game-list-thumb" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">&#127918;</div>
+                  <div class="game-list-info">
+                    <div class="game-list-name">Donkey Kong</div>
+                    <div class="game-list-detail">NROM &bull; 24 KB &bull; 3h played</div>
+                  </div>
+                  <div class="game-list-play">&#9654;</div>
+                </div>
+                <div class="game-list-item">
+                  <div class="game-list-thumb" style="background: linear-gradient(135deg, #f39c12, #e67e22);">&#128123;</div>
+                  <div class="game-list-info">
+                    <div class="game-list-name">Pac-Man</div>
+                    <div class="game-list-detail">NROM &bull; 24 KB &bull; 1h played</div>
+                  </div>
+                  <div class="game-list-play">&#9654;</div>
+                </div>
+                <div class="game-list-item">
+                  <div class="game-list-thumb" style="background: linear-gradient(135deg, #3498db, #2980b9);">&#129302;</div>
+                  <div class="game-list-info">
+                    <div class="game-list-name">Mega Man</div>
+                    <div class="game-list-detail">MMC1 &bull; 128 KB &bull; 5h played</div>
+                  </div>
+                  <div class="game-list-play">&#9654;</div>
+                </div>
+                <div class="game-list-item">
+                  <div class="game-list-thumb" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">&#127939;</div>
+                  <div class="game-list-info">
+                    <div class="game-list-name">Super Mario Bros</div>
+                    <div class="game-list-detail">NROM &bull; 32 KB &bull; 12h played</div>
+                  </div>
+                  <div class="game-list-play">&#9654;</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bottom-nav">
+              <div class="bottom-nav-item active">
+                <div class="bottom-nav-icon">&#127918;</div>
+                <span>Library</span>
+              </div>
+              <div class="bottom-nav-item">
+                <div class="bottom-nav-icon">&#11088;</div>
+                <span>Favorites</span>
+              </div>
+              <div class="bottom-nav-item">
+                <div class="bottom-nav-icon">&#128190;</div>
+                <span>Saves</span>
+              </div>
+              <div class="bottom-nav-item">
+                <div class="bottom-nav-icon">&#9881;</div>
+                <span>Settings</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">Android - Library</div>
+      </div>
+
+      <!-- Phone Settings -->
+      <div class="mockup-wrapper">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <span style="display:flex;gap:4px;font-size:10px;">
+                <span>&#9679;&#9679;&#9679;&#9679;</span>
+                <span>&#128267;</span>
+              </span>
+            </div>
+            <div class="settings-screen">
+              <div class="settings-header">Settings</div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Display</div>
+                <div class="settings-item">
+                  <span class="settings-label">Aspect Ratio</span>
+                  <span class="settings-value">4:3 Original</span>
+                </div>
+                <div class="settings-item">
+                  <span class="settings-label">Pixel Filter</span>
+                  <span class="settings-value">CRT Scanline</span>
+                </div>
+                <div class="settings-item">
+                  <span class="settings-label">Show FPS</span>
+                  <div class="toggle on"></div>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Audio</div>
+                <div class="settings-item">
+                  <span class="settings-label">Sound</span>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="settings-item">
+                  <span class="settings-label">Volume</span>
+                  <span class="settings-value">80%</span>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Controls</div>
+                <div class="settings-item">
+                  <span class="settings-label">Vibration</span>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="settings-item">
+                  <span class="settings-label">Button Size</span>
+                  <span class="settings-value">Medium</span>
+                </div>
+                <div class="settings-item">
+                  <span class="settings-label">Opacity</span>
+                  <span class="settings-value">70%</span>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Advanced</div>
+                <div class="settings-item">
+                  <span class="settings-label">Debug Mode</span>
+                  <div class="toggle off"></div>
+                </div>
+                <div class="settings-item">
+                  <span class="settings-label">ROM Directory</span>
+                  <span class="settings-value">/sdcard/roms</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="bottom-nav">
+              <div class="bottom-nav-item">
+                <div class="bottom-nav-icon">&#127918;</div>
+                <span>Library</span>
+              </div>
+              <div class="bottom-nav-item">
+                <div class="bottom-nav-icon">&#11088;</div>
+                <span>Favorites</span>
+              </div>
+              <div class="bottom-nav-item">
+                <div class="bottom-nav-icon">&#128190;</div>
+                <span>Saves</span>
+              </div>
+              <div class="bottom-nav-item active">
+                <div class="bottom-nav-icon">&#9881;</div>
+                <span>Settings</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">Android - Settings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 4: Mobile - Gameplay ===== -->
+  <div class="slide" data-slide="3">
+    <div class="slide-title">Mobile - Gameplay</div>
+    <div class="slide-desc">Full-screen gameplay with virtual gamepad overlay</div>
+    <div class="mockup-row">
+      <!-- Portrait -->
+      <div class="mockup-wrapper">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="gameplay-screen">
+              <div class="gameplay-topbar">
+                <span class="gameplay-back">&larr; Back</span>
+                <span class="gameplay-title">Donkey Kong</span>
+                <span class="gameplay-menu">&#8942;</span>
+              </div>
+              <div class="gameplay-viewport">
+                <div class="gameplay-placeholder">
+                  <div style="font-size: 48px;">&#127918;</div>
+                  <div style="font-size: 14px; color: var(--text-dim); font-weight: 600;">NES 256 x 240</div>
+                  <div style="font-size: 10px; color: var(--text-dim);">Donkey Kong - NROM</div>
+                </div>
+                <div class="gameplay-fps">60 FPS</div>
+              </div>
+              <div class="gameplay-controls">
+                <div class="controls-row">
+                  <div class="joystick">
+                    <div class="joystick-arrows">
+                      <span class="j-up">&uarr;</span>
+                      <span class="j-down">&darr;</span>
+                      <span class="j-left">&larr;</span>
+                      <span class="j-right">&rarr;</span>
+                    </div>
+                    <div class="joystick-thumb"></div>
+                  </div>
+                  <div class="action-btns-grid">
+                    <div class="action-btn btn-turbo-b" style="width:44px;height:44px;font-size:13px;"><span class="turbo-label">TURBO</span><span class="turbo-letter">B</span></div>
+                    <div class="action-btn btn-turbo-a" style="width:44px;height:44px;font-size:13px;"><span class="turbo-label">TURBO</span><span class="turbo-letter">A</span></div>
+                    <div class="action-btn btn-b">B</div>
+                    <div class="action-btn btn-a">A</div>
+                  </div>
+                </div>
+                <div class="system-btns">
+                  <span class="sys-btn">SELECT</span>
+                  <span class="sys-btn">START</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">Portrait Mode</div>
+      </div>
+
+      <!-- Landscape -->
+      <div class="mockup-wrapper">
+        <div style="width: 640px; height: 340px; background: #0d0d14; border-radius: 24px; border: 3px solid #333; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.6); display: flex; position: relative;">
+          <!-- Landscape left controls -->
+          <div style="width: 140px; display: flex; align-items: center; justify-content: center;">
+            <div class="joystick" style="width: 95px; height: 95px;">
+              <div class="joystick-arrows">
+                <span class="j-up">&uarr;</span>
+                <span class="j-down">&darr;</span>
+                <span class="j-left">&larr;</span>
+                <span class="j-right">&rarr;</span>
+              </div>
+              <div class="joystick-thumb" style="width: 40px; height: 40px; transform: translate(5px, -3px);"></div>
+            </div>
+          </div>
+
+          <!-- Center viewport -->
+          <div style="flex: 1; display: flex; flex-direction: column; padding: 6px 0;">
+            <div style="flex: 1; background: #111; border-radius: 6px; margin: 0 4px; display: flex; align-items: center; justify-content: center; position: relative;">
+              <div style="text-align: center;">
+                <div style="font-size: 36px;">&#127918;</div>
+                <div style="font-size: 12px; color: var(--text-dim); font-weight: 600; margin-top: 4px;">NES 256 x 240</div>
+              </div>
+              <div style="position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: 'JetBrains Mono'; color: var(--accent-green); background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 3px;">60 FPS</div>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 16px; padding: 4px;">
+              <span class="sys-btn" style="font-size: 9px; padding: 4px 14px;">SELECT</span>
+              <span class="sys-btn" style="font-size: 9px; padding: 4px 14px;">START</span>
+            </div>
+          </div>
+
+          <!-- Right action buttons -->
+          <div style="width: 160px; display: flex; align-items: center; justify-content: center;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; justify-items: center; align-items: center;">
+              <div class="action-btn btn-turbo-b" style="width: 38px; height: 38px; font-size: 11px;"><span class="turbo-label" style="font-size:6px;top:3px;">TURBO</span><span class="turbo-letter">B</span></div>
+              <div class="action-btn btn-turbo-a" style="width: 38px; height: 38px; font-size: 11px;"><span class="turbo-label" style="font-size:6px;top:3px;">TURBO</span><span class="turbo-letter">A</span></div>
+              <div class="action-btn btn-b" style="width: 46px; height: 46px; font-size: 14px;">B</div>
+              <div class="action-btn btn-a" style="width: 46px; height: 46px; font-size: 14px;">A</div>
+            </div>
+          </div>
+        </div>
+        <div class="mockup-label">Landscape Mode (Fullscreen)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 5: Desktop - Library ===== -->
+  <div class="slide" data-slide="4">
+    <div class="slide-title">macOS - Game Library</div>
+    <div class="slide-desc">Desktop layout with sidebar navigation and grid view</div>
+    <div class="mockup-wrapper">
+      <div class="desktop-frame">
+        <div class="desktop-titlebar">
+          <div class="titlebar-dot red"></div>
+          <div class="titlebar-dot yellow"></div>
+          <div class="titlebar-dot green"></div>
+          <div class="titlebar-text">Nez - Game Library</div>
+          <div style="width: 52px;"></div>
+        </div>
+        <div class="desktop-content">
+          <div class="desktop-sidebar">
+            <div class="sidebar-logo">Nez</div>
+            <div class="sidebar-section-title">Browse</div>
+            <div class="sidebar-item active">
+              <span class="sidebar-item-icon">&#127918;</span>
+              <span>All Games</span>
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#11088;</span>
+              <span>Favorites</span>
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128338;</span>
+              <span>Recent</span>
+            </div>
+            <div style="margin-top: 20px;"></div>
+            <div class="sidebar-section-title">Mappers</div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon" style="font-size:10px;font-family:'JetBrains Mono'">NR</span>
+              <span>NROM</span>
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon" style="font-size:10px;font-family:'JetBrains Mono'">M1</span>
+              <span>MMC1</span>
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon" style="font-size:10px;font-family:'JetBrains Mono'">Ux</span>
+              <span>UxROM</span>
+            </div>
+            <div style="flex:1;"></div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#9881;</span>
+              <span>Settings</span>
+            </div>
+          </div>
+          <div class="desktop-main">
+            <div class="desktop-toolbar">
+              <div class="toolbar-search">
+                <span>&#128269;</span>
+                <span>Search ROMs...</span>
+                <span style="flex:1;"></span>
+                <span class="kbd">&#8984;F</span>
+              </div>
+              <div style="flex:1;"></div>
+              <div class="toolbar-view-toggle">
+                <div class="view-btn active">&#9638;</div>
+                <div class="view-btn">&#9776;</div>
+              </div>
+              <div class="dgt-btn">+ Add ROM <span class="kbd">&#8984;O</span></div>
+            </div>
+            <div class="desktop-grid">
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                  <span style="font-size: 32px;">&#127918;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Donkey Kong</div>
+                  <div class="desktop-game-detail">NROM &bull; 24 KB</div>
+                </div>
+              </div>
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
+                  <span style="font-size: 32px;">&#128123;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Pac-Man</div>
+                  <div class="desktop-game-detail">NROM &bull; 24 KB</div>
+                </div>
+              </div>
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #3498db, #2980b9);">
+                  <span style="font-size: 32px;">&#129302;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Mega Man</div>
+                  <div class="desktop-game-detail">MMC1 &bull; 128 KB</div>
+                </div>
+              </div>
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                  <span style="font-size: 32px;">&#127939;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Super Mario Bros</div>
+                  <div class="desktop-game-detail">NROM &bull; 32 KB</div>
+                </div>
+              </div>
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                  <span style="font-size: 32px;">&#128165;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Contra</div>
+                  <div class="desktop-game-detail">UxROM &bull; 64 KB</div>
+                </div>
+              </div>
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #1abc9c, #16a085);">
+                  <span style="font-size: 32px;">&#127936;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Tetris</div>
+                  <div class="desktop-game-detail">NROM &bull; 24 KB</div>
+                </div>
+              </div>
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #e91e63, #c2185b);">
+                  <span style="font-size: 32px;">&#9876;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Castlevania</div>
+                  <div class="desktop-game-detail">UxROM &bull; 128 KB</div>
+                </div>
+              </div>
+              <div class="desktop-game-card">
+                <div class="desktop-game-thumb" style="background: linear-gradient(135deg, #607d8b, #455a64);">
+                  <span style="font-size: 32px;">&#128640;</span>
+                </div>
+                <div class="desktop-game-info">
+                  <div class="desktop-game-name">Gradius</div>
+                  <div class="desktop-game-detail">MMC1 &bull; 64 KB</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mockup-label">macOS Desktop - Library View</div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 6: Desktop - Gameplay + Debug ===== -->
+  <div class="slide" data-slide="5">
+    <div class="slide-title">macOS - Gameplay & Debug</div>
+    <div class="slide-desc">Full gameplay view with optional debug panel (CPU registers, palettes, pattern tables)</div>
+    <div class="mockup-wrapper">
+      <div class="desktop-frame" style="width: 880px; height: 520px;">
+        <div class="desktop-titlebar">
+          <div class="titlebar-dot red"></div>
+          <div class="titlebar-dot yellow"></div>
+          <div class="titlebar-dot green"></div>
+          <div class="titlebar-text">Nez - Donkey Kong</div>
+          <div style="width: 52px;"></div>
+        </div>
+        <div class="desktop-content">
+          <div class="desktop-gameplay">
+            <div class="desktop-gameplay-toolbar">
+              <div class="dgt-btn">&larr; Library <span class="kbd">Esc</span></div>
+              <div style="flex:1;"></div>
+              <div class="dgt-btn">&#9208; Pause <span class="kbd">Space</span></div>
+              <div class="dgt-btn">&#128190; Save State <span class="kbd">&#8984;S</span></div>
+              <div class="dgt-btn">&#128194; Load State <span class="kbd">&#8984;L</span></div>
+              <div class="dgt-btn">&#128248; Screenshot <span class="kbd">F12</span></div>
+              <div class="dgt-btn primary">&#128736; Debug <span class="kbd">&#8984;D</span></div>
+            </div>
+            <div class="desktop-viewport-container">
+              <div class="desktop-viewport" style="width: 420px; height: 360px;">
+                <div style="font-size: 52px;">&#127918;</div>
+                <div class="desktop-viewport-label">NES Game Viewport</div>
+                <div class="desktop-viewport-res">256 x 240 &rarr; scaled 2x</div>
+              </div>
+              <div class="desktop-fps">60 FPS &bull; Frame 184520</div>
+            </div>
+            <!-- Keybindings Bar -->
+            <div class="keybindings-bar">
+              <div class="keybind-item"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> Move</div>
+              <div class="keybind-sep"></div>
+              <div class="keybind-item"><span class="kbd">J</span> A Button</div>
+              <div class="keybind-item"><span class="kbd">K</span> B Button</div>
+              <div class="keybind-sep"></div>
+              <div class="keybind-item"><span class="kbd">U</span> Turbo A</div>
+              <div class="keybind-item"><span class="kbd">I</span> Turbo B</div>
+              <div class="keybind-sep"></div>
+              <div class="keybind-item"><span class="kbd">Enter</span> Start</div>
+              <div class="keybind-item"><span class="kbd">X</span> Select</div>
+            </div>
+          </div>
+          <!-- Debug Panel -->
+          <div class="desktop-debug-panel">
+            <div>
+              <div class="debug-section-title">CPU Registers</div>
+              <div class="debug-register">
+                <span class="debug-reg-name">PC</span>
+                <span class="debug-reg-val">$C5A2</span>
+              </div>
+              <div class="debug-register">
+                <span class="debug-reg-name">A</span>
+                <span class="debug-reg-val">$0F</span>
+              </div>
+              <div class="debug-register">
+                <span class="debug-reg-name">X</span>
+                <span class="debug-reg-val">$03</span>
+              </div>
+              <div class="debug-register">
+                <span class="debug-reg-name">Y</span>
+                <span class="debug-reg-val">$00</span>
+              </div>
+              <div class="debug-register">
+                <span class="debug-reg-name">SP</span>
+                <span class="debug-reg-val">$FD</span>
+              </div>
+              <div class="debug-register">
+                <span class="debug-reg-name">Status</span>
+                <span class="debug-reg-val">NV-BDIZC</span>
+              </div>
+            </div>
+            <div>
+              <div class="debug-section-title">PPU Status</div>
+              <div class="debug-register">
+                <span class="debug-reg-name">Scanline</span>
+                <span class="debug-reg-val">142</span>
+              </div>
+              <div class="debug-register">
+                <span class="debug-reg-name">Cycle</span>
+                <span class="debug-reg-val">267</span>
+              </div>
+              <div class="debug-register">
+                <span class="debug-reg-name">VBlank</span>
+                <span class="debug-reg-val" style="color:var(--accent-green)">OFF</span>
+              </div>
+            </div>
+            <div>
+              <div class="debug-section-title">BG Palettes</div>
+              <div class="debug-palette-row">
+                <div class="debug-color-swatch" style="background:#0f0f0f;"></div>
+                <div class="debug-color-swatch" style="background:#b53120;"></div>
+                <div class="debug-color-swatch" style="background:#fcbcb0;"></div>
+                <div class="debug-color-swatch" style="background:#f87858;"></div>
+              </div>
+              <div class="debug-palette-row">
+                <div class="debug-color-swatch" style="background:#0f0f0f;"></div>
+                <div class="debug-color-swatch" style="background:#503000;"></div>
+                <div class="debug-color-swatch" style="background:#fcd8a8;"></div>
+                <div class="debug-color-swatch" style="background:#bcbcbc;"></div>
+              </div>
+              <div class="debug-palette-row">
+                <div class="debug-color-swatch" style="background:#0f0f0f;"></div>
+                <div class="debug-color-swatch" style="background:#007880;"></div>
+                <div class="debug-color-swatch" style="background:#6888fc;"></div>
+                <div class="debug-color-swatch" style="background:#bcbcbc;"></div>
+              </div>
+            </div>
+            <div>
+              <div class="debug-section-title">Pattern Table</div>
+              <div class="debug-pt-placeholder">
+                <span>128 x 128 CHR</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mockup-label">macOS Desktop - Gameplay + Debug Panel</div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 7: Features & Tech ===== -->
+  <div class="slide" data-slide="6">
+    <div class="slide-title">Tech Stack & Features</div>
+    <div class="slide-desc">Modern toolkit for a retro experience</div>
+    <div class="tech-grid">
+      <div class="tech-card">
+        <div class="tech-icon">&#128171;</div>
+        <div class="tech-name">Flutter 3.x</div>
+        <div class="tech-desc">Cross-platform UI framework. Material 3 design system with adaptive layouts for phone and desktop.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">&#9889;</div>
+        <div class="tech-name">Zig Core via FFI</div>
+        <div class="tech-desc">Compile Zig emulator to C ABI .so/.dylib. dart:ffi calls directly into CPU/PPU/APU with zero overhead.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">&#127912;</div>
+        <div class="tech-name">Texture Rendering</div>
+        <div class="tech-desc">Flutter Texture widget renders NES frame buffer at 60fps. Shared memory buffer between Zig and Dart.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">&#127926;</div>
+        <div class="tech-name">Low-Latency Audio</div>
+        <div class="tech-desc">Platform audio via method channel. Android AudioTrack / macOS CoreAudio for minimal audio latency.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">&#128190;</div>
+        <div class="tech-name">Save States</div>
+        <div class="tech-desc">Snapshot full emulator state (CPU, PPU, RAM). Multiple save slots with thumbnail previews.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-icon">&#128736;</div>
+        <div class="tech-name">Debug Tools</div>
+        <div class="tech-desc">CPU register viewer, PPU palette & pattern tables, OAM sprite inspector. Ported from Raylib debug views.</div>
+      </div>
+    </div>
+
+    <div class="color-row">
+      <div class="color-chip">
+        <div class="color-swatch" style="background: #6c5ce7;"></div>
+        <span class="color-label">Primary #6C5CE7</span>
+      </div>
+      <div class="color-chip">
+        <div class="color-swatch" style="background: #a29bfe;"></div>
+        <span class="color-label">Secondary #A29BFE</span>
+      </div>
+      <div class="color-chip">
+        <div class="color-swatch" style="background: #0a0a0f;"></div>
+        <span class="color-label">Background #0A0A0F</span>
+      </div>
+      <div class="color-chip">
+        <div class="color-swatch" style="background: #ff6b6b;"></div>
+        <span class="color-label">Accent #FF6B6B</span>
+      </div>
+      <div class="color-chip">
+        <div class="color-swatch" style="background: #22d3ee;"></div>
+        <span class="color-label">Info #22D3EE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 8: Roadmap ===== -->
+  <div class="slide" data-slide="7">
+    <div class="slide-title">Implementation Roadmap</div>
+    <div class="slide-desc">Phase-by-phase delivery plan</div>
+    <ul class="feature-list">
+      <li>
+        <div class="feature-icon purple">1</div>
+        <div>
+          <strong style="color:var(--text-primary);">Phase 1: Project Setup & FFI Bridge</strong><br/>
+          Flutter project scaffold, Zig C-ABI export, dart:ffi bindings, frame buffer shared memory
+        </div>
+      </li>
+      <li>
+        <div class="feature-icon red">2</div>
+        <div>
+          <strong style="color:var(--text-primary);">Phase 2: Core Rendering & Input</strong><br/>
+          Texture widget 60fps rendering, keyboard input (macOS), virtual gamepad (Android), audio bridge
+        </div>
+      </li>
+      <li>
+        <div class="feature-icon cyan">3</div>
+        <div>
+          <strong style="color:var(--text-primary);">Phase 3: Library & ROM Management</strong><br/>
+          ROM file picker, iNES header parsing, game library with thumbnails, search & filter
+        </div>
+      </li>
+      <li>
+        <div class="feature-icon green">4</div>
+        <div>
+          <strong style="color:var(--text-primary);">Phase 4: Save States & Settings</strong><br/>
+          Save/load state system, persistent settings, CRT/pixel shader filters, favorites
+        </div>
+      </li>
+      <li>
+        <div class="feature-icon orange">5</div>
+        <div>
+          <strong style="color:var(--text-primary);">Phase 5: Debug Tools & Polish</strong><br/>
+          CPU/PPU debug panel, pattern table viewer, OAM inspector, performance optimization
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="nav-bar">
+  <button class="nav-btn" onclick="changeSlide(-1)">&larr;</button>
+  <div class="nav-dot active" onclick="goToSlide(0)"></div>
+  <div class="nav-dot" onclick="goToSlide(1)"></div>
+  <div class="nav-dot" onclick="goToSlide(2)"></div>
+  <div class="nav-dot" onclick="goToSlide(3)"></div>
+  <div class="nav-dot" onclick="goToSlide(4)"></div>
+  <div class="nav-dot" onclick="goToSlide(5)"></div>
+  <div class="nav-dot" onclick="goToSlide(6)"></div>
+  <div class="nav-dot" onclick="goToSlide(7)"></div>
+  <span class="slide-counter" id="counter">1 / 8</span>
+  <button class="nav-btn" onclick="changeSlide(1)">&rarr;</button>
+</div>
+
+<script>
+  let currentSlide = 0;
+  const totalSlides = 8;
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('.nav-dot');
+
+  function goToSlide(n) {
+    slides[currentSlide].classList.remove('active');
+    slides[currentSlide].classList.add(n > currentSlide ? 'prev' : '');
+
+    setTimeout(() => {
+      slides.forEach(s => s.classList.remove('prev'));
+    }, 500);
+
+    currentSlide = n;
+    slides[currentSlide].classList.add('active');
+
+    dots.forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+    document.getElementById('counter').textContent = `${currentSlide + 1} / ${totalSlides}`;
+  }
+
+  function changeSlide(dir) {
+    const next = currentSlide + dir;
+    if (next >= 0 && next < totalSlides) goToSlide(next);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); }
+  });
+
+  // Touch swipe support
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  document.addEventListener('touchend', (e) => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1);
+  });
+</script>
+
+</body>
+</html>
