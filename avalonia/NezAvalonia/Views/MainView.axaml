@@ -51,6 +51,16 @@
                                     <TextBlock Text="Games" VerticalAlignment="Center" FontSize="14"/>
                                 </StackPanel>
                             </Button>
+                            <Button Name="NavRecordings" Classes="sidebar-item"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Click="OnNavRecordings">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <PathIcon Data="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
+                                              Foreground="#A29BFE" Width="18" Height="18"/>
+                                    <TextBlock Text="Recordings" VerticalAlignment="Center" FontSize="14"/>
+                                </StackPanel>
+                            </Button>
                             <Button Name="NavSettings" Classes="sidebar-item"
                                     HorizontalAlignment="Stretch"
                                     HorizontalContentAlignment="Left"
@@ -75,6 +85,9 @@
                 <Panel Grid.Column="1">
                     <views:LibraryView Name="LibraryPage"
                                         DataContext="{Binding LibraryVm}"/>
+                    <views:RecordingsView Name="RecordingsPage"
+                                           DataContext="{Binding RecordingsVm}"
+                                           IsVisible="False"/>
                     <views:SettingsView Name="SettingsPage"
                                          DataContext="{Binding SettingsVm}"
                                          IsVisible="False"/>

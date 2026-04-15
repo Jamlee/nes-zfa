@@ -17,14 +17,26 @@ public partial class MainView : UserControl
     {
         Vm.SelectedIndex = 0;
         LibraryPage!.IsVisible = true;
+        RecordingsPage!.IsVisible = false;
         SettingsPage!.IsVisible = false;
+        UpdateSidebarHighlight();
+    }
+
+    private void OnNavRecordings(object? sender, RoutedEventArgs e)
+    {
+        Vm.SelectedIndex = 1;
+        LibraryPage!.IsVisible = false;
+        RecordingsPage!.IsVisible = true;
+        SettingsPage!.IsVisible = false;
+        Vm.RecordingsVm.LoadRecordingsCommand.Execute(null);
         UpdateSidebarHighlight();
     }
 
     private void OnNavSettings(object? sender, RoutedEventArgs e)
     {
-        Vm.SelectedIndex = 1;
+        Vm.SelectedIndex = 2;
         LibraryPage!.IsVisible = false;
+        RecordingsPage!.IsVisible = false;
         SettingsPage!.IsVisible = true;
         UpdateSidebarHighlight();
     }
@@ -34,7 +46,10 @@ public partial class MainView : UserControl
         NavLibrary!.Background = Vm.SelectedIndex == 0
             ? Core.NezTheme.BgElevatedBrush
             : Avalonia.Media.Brushes.Transparent;
-        NavSettings!.Background = Vm.SelectedIndex == 1
+        NavRecordings!.Background = Vm.SelectedIndex == 1
+            ? Core.NezTheme.BgElevatedBrush
+            : Avalonia.Media.Brushes.Transparent;
+        NavSettings!.Background = Vm.SelectedIndex == 2
             ? Core.NezTheme.BgElevatedBrush
             : Avalonia.Media.Brushes.Transparent;
     }

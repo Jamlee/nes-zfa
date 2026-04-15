@@ -362,7 +362,12 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
 
             gif.Metadata.GetGifMetadata().RepeatCount = 0;
 
-            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"nez_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.gif");
+            var recordingsDir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".nes-zfa", "recordings");
+            Directory.CreateDirectory(recordingsDir);
+
+            var path = System.IO.Path.Combine(recordingsDir, $"nez_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.gif");
             gif.SaveAsGif(path);
             return path;
         }

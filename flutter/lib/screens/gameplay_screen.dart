@@ -85,6 +85,16 @@ class _GameplayScreenState extends State<GameplayScreen>
     setState(() {});
   }
 
+  Future<void> _fitWindow() async {
+    if (!Platform.isMacOS) return;
+    try {
+      await const MethodChannel('com.nez/window')
+          .invokeMethod('fitToAspectRatio', {'chromeHeight': 80.0});
+    } catch (e) {
+      debugPrint('NEZ: fitWindow error: $e');
+    }
+  }
+
   // ---- Keyboard handling for macOS ----
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -207,6 +217,7 @@ class _GameplayScreenState extends State<GameplayScreen>
           },
           onToggleDebug: () => setState(() => _showDebug = !_showDebug),
           onRecord: _toggleRecording,
+          onFit: _fitWindow,
         ),
         // Main content
         Expanded(
@@ -385,6 +396,7 @@ class _DesktopToolbar extends StatelessWidget {
   final VoidCallback onPause;
   final VoidCallback onToggleDebug;
   final VoidCallback onRecord;
+  final VoidCallback onFit;
 
   const _DesktopToolbar({
     required this.romName,
@@ -395,6 +407,7 @@ class _DesktopToolbar extends StatelessWidget {
     required this.onPause,
     required this.onToggleDebug,
     required this.onRecord,
+    required this.onFit,
   });
 
   @override
@@ -425,6 +438,8 @@ class _DesktopToolbar extends StatelessWidget {
             onTap: onRecord,
             highlighted: isRecording,
           ),
+          const SizedBox(width: 6),
+          _ToolbarBtn(icon: Icons.fit_screen, label: 'Fit', onTap: onFit),
           const SizedBox(width: 6),
           _ToolbarBtn(icon: Icons.bug_report, label: 'Debug', kbd: '⌘D', onTap: onToggleDebug, highlighted: showDebug),
         ],

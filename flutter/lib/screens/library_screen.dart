@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/bundled_roms.dart';
 import '../core/theme.dart';
 import 'gameplay_screen.dart';
 
@@ -112,6 +113,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
       }
     }
     setState(() => _initialized = true);
+
+    // Auto-add bundled ROMs only on first launch (no saved data).
+    // If saved data exists, the user's library is authoritative—removed
+    // bundled ROMs should stay removed.
+    if (jsonStr != null) return;
+    try {
+      final bundledPaths = await BundledRomManager.ensureBundledRoms();
+      for (final path in bundledPaths) {
+        if (_roms.any((r) => r.path == path)) continue;
+        final file = File(path);
+        if (!await file.exists()) continue;
+        final name = path.split('/').last.replaceAll('.nes', '');
+        final size = await file.length();
+        final entry = RomEntry(
+          name: name,
+          path: path,
+          sizeKB: size ~/ 1024,
+          color: RomEntry._colorForIndex(_roms.length),
+          icon: Icons.videogame_asset,
+        );
+        _roms.add(entry);
+      }
+      if (bundledPaths.isNotEmpty) {
+        _saveRoms();
+        if (mounted) setState(() {});
+      }
+    } catch (e) {
+      debugPrint('NEZ: bundled ROM load error: $e');
+    }
   }
 
   /// Save ROM list to shared_preferences.

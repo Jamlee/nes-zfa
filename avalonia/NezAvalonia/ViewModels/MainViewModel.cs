@@ -20,6 +20,7 @@ public partial class MainViewModel : ObservableObject
 
     // View instances (lazy created by the MainWindow)
     public LibraryViewModel LibraryVm { get; } = new();
+    public RecordingsViewModel RecordingsVm { get; } = new();
     public SettingsViewModel SettingsVm { get; } = new();
 
     // Navigation to gameplay

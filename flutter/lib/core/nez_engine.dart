@@ -252,8 +252,17 @@ class NezEngine extends ChangeNotifier {
     final frames = List<Uint8List>.from(_recordedFrames);
     _recordedFrames.clear();
 
+    // On Android, get the app files dir via method channel
+    String? appDir;
+    if (Platform.isAndroid) {
+      try {
+        appDir = await const MethodChannel('com.nez/storage')
+            .invokeMethod<String>('getFilesDir');
+      } catch (_) {}
+    }
+
     // Encode in background isolate
-    return compute(_encodeGifIsolate, _GifParams(w, h, frames));
+    return compute(_encodeGifIsolate, _GifParams(w, h, frames, appDir: appDir));
   }
 
   /// Stop and clean up.
@@ -271,7 +280,8 @@ class NezEngine extends ChangeNotifier {
 class _GifParams {
   final int w, h;
   final List<Uint8List> frames;
-  _GifParams(this.w, this.h, this.frames);
+  final String? appDir;
+  _GifParams(this.w, this.h, this.frames, {this.appDir});
 }
 
 String? _encodeGifIsolate(_GifParams p) {
@@ -294,7 +304,22 @@ String? _encodeGifIsolate(_GifParams p) {
     }
 
     final encoded = img.encodeGif(firstFrame);
-    final path = '${Directory.systemTemp.path}/nez_${DateTime.now().millisecondsSinceEpoch}.gif';
+
+    // Determine output directory
+    String dirPath;
+    if (p.appDir != null) {
+      // Android: use app files dir
+      dirPath = '${p.appDir}/recordings';
+    } else {
+      // Desktop: use ~/.nes-zfa/recordings/
+      final home = Platform.environment['HOME'] ??
+          Platform.environment['USERPROFILE'] ??
+          Directory.systemTemp.path;
+      dirPath = '$home/.nes-zfa/recordings';
+    }
+    Directory(dirPath).createSync(recursive: true);
+
+    final path = '$dirPath/nez_${DateTime.now().millisecondsSinceEpoch}.gif';
     File(path).writeAsBytesSync(encoded);
     return path;
   } catch (_) {

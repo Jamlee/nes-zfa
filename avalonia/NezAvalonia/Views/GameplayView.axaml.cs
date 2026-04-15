@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -126,6 +127,19 @@ public partial class GameplayView : UserControl
     private void OnToggleDebug(object? sender, RoutedEventArgs e)
     {
         Vm?.ToggleDebugCommand.Execute(null);
+        Focus();
+    }
+
+    private void OnFitWindow(object? sender, RoutedEventArgs e)
+    {
+        var window = this.FindAncestorOfType<Window>();
+        if (window == null) return;
+
+        const double nesAspect = 256.0 / 240.0;
+        const double chromeHeight = 80.0; // toolbar + keybindings bar
+        var currentWidth = window.Width;
+        var nesHeight = currentWidth / nesAspect;
+        window.Height = nesHeight + chromeHeight;
         Focus();
     }
 }

@@ -58,6 +58,12 @@
                                 <ctrl:KeyBadge Label="Space"/>
                             </StackPanel>
                         </Button>
+                        <Button Click="OnFitWindow" Classes="toolbar">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="&#x2922;" FontSize="12" Foreground="#A29BFE"/>
+                                <TextBlock Text="Fit" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
                         <Button Click="OnToggleDebug" Classes="toolbar">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Text="&#x1F41B;" FontSize="11"/>

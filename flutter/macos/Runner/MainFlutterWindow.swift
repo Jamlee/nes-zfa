@@ -18,6 +18,29 @@ class MainFlutterWindow: NSWindow {
     self.minSize = NSSize(width: 800, height: 600)
     self.title = "Nez"
 
+    // Method channel for window control
+    let channel = FlutterMethodChannel(name: "com.nez/window",
+                                       binaryMessenger: flutterViewController.engine.binaryMessenger)
+    channel.setMethodCallHandler { [weak self] (call, result) in
+      guard let self = self else { result(FlutterMethodNotImplemented); return }
+      if call.method == "fitToAspectRatio" {
+        let args = call.arguments as? [String: Any]
+        let chromeHeight = args?["chromeHeight"] as? CGFloat ?? 80.0
+        let currentWidth = self.frame.width
+        // NES aspect ratio: 256:240
+        let nesHeight = currentWidth * (240.0 / 256.0)
+        let newHeight = nesHeight + chromeHeight
+        let newFrame = NSRect(x: self.frame.origin.x,
+                              y: self.frame.origin.y + self.frame.height - newHeight,
+                              width: currentWidth,
+                              height: newHeight)
+        self.setFrame(newFrame, display: true, animate: true)
+        result(nil)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     RegisterGeneratedPlugins(registry: flutterViewController)
 
     super.awakeFromNib()

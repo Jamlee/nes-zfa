@@ -7,6 +7,10 @@ NES emulator with Zig core and multiple UI frontends.
     <img src="./lib/screens/tetris.gif" alt="Tetris" width="256px"/>
 </div>
 
+## Screenshots
+
+![Jackal](docs/screens/jackal.gif)
+
 ```
 ├── lib/          Zig emulator core (CPU, PPU, APU, mappers)
 ├── flutter/      Flutter UI (macOS, Android)

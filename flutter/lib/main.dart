@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/theme.dart';
 import 'screens/library_screen.dart';
+import 'screens/recordings_screen.dart';
 import 'screens/settings_screen.dart';
 
 void main() {
@@ -40,6 +41,11 @@ class _NezShellState extends State<NezShell> {
       label: 'Library',
     ),
     NavigationDestination(
+      icon: Icon(Icons.videocam_outlined),
+      selectedIcon: Icon(Icons.videocam),
+      label: 'Recordings',
+    ),
+    NavigationDestination(
       icon: Icon(Icons.settings_outlined),
       selectedIcon: Icon(Icons.settings),
       label: 'Settings',
@@ -48,6 +54,7 @@ class _NezShellState extends State<NezShell> {
 
   static const _screens = [
     LibraryScreen(),
+    RecordingsScreen(),
     SettingsScreen(),
   ];
 
@@ -110,12 +117,18 @@ class _NezShellState extends State<NezShell> {
                   selected: _selectedIndex == 0,
                   onTap: () => setState(() => _selectedIndex = 0),
                 ),
+                _SidebarItem(
+                  icon: Icons.videocam,
+                  label: 'Recordings',
+                  selected: _selectedIndex == 1,
+                  onTap: () => setState(() => _selectedIndex = 1),
+                ),
                 const Spacer(),
                 _SidebarItem(
                   icon: Icons.settings,
                   label: 'Settings',
-                  selected: _selectedIndex == 1,
-                  onTap: () => setState(() => _selectedIndex = 1),
+                  selected: _selectedIndex == 2,
+                  onTap: () => setState(() => _selectedIndex = 2),
                 ),
                 const SizedBox(height: 16),
               ],
