@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/theme.dart';
 
-/// Settings screen.
+/// Settings screen with persistent preferences.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -20,6 +21,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _pixelFilter = 'None';
   String _buttonSize = 'Medium';
   double _buttonOpacity = 0.7;
+
+  SharedPreferences? _prefs;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    _prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _showFps = _prefs!.getBool('showFps') ?? true;
+      _soundEnabled = _prefs!.getBool('soundEnabled') ?? true;
+      _vibration = _prefs!.getBool('vibration') ?? true;
+      _debugMode = _prefs!.getBool('debugMode') ?? false;
+      _volume = _prefs!.getDouble('volume') ?? 0.8;
+      _aspectRatio = _prefs!.getString('aspectRatio') ?? '4:3 Original';
+      _pixelFilter = _prefs!.getString('pixelFilter') ?? 'None';
+      _buttonSize = _prefs!.getString('buttonSize') ?? 'Medium';
+      _buttonOpacity = _prefs!.getDouble('buttonOpacity') ?? 0.7;
+    });
+  }
+
+  void _save(String key, dynamic value) {
+    if (_prefs == null) return;
+    if (value is bool) _prefs!.setBool(key, value);
+    else if (value is double) _prefs!.setDouble(key, value);
+    else if (value is String) _prefs!.setString(key, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,18 +75,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: 'Aspect Ratio',
                   value: _aspectRatio,
                   options: const ['4:3 Original', '16:9 Stretch', 'Pixel Perfect'],
-                  onChanged: (v) => setState(() => _aspectRatio = v),
+                  onChanged: (v) { setState(() => _aspectRatio = v); _save('aspectRatio', v); },
                 ),
                 _SettingsDropdown(
                   label: 'Pixel Filter',
                   value: _pixelFilter,
                   options: const ['None', 'CRT Scanline', 'LCD Grid'],
-                  onChanged: (v) => setState(() => _pixelFilter = v),
+                  onChanged: (v) { setState(() => _pixelFilter = v); _save('pixelFilter', v); },
                 ),
                 _SettingsToggle(
                   label: 'Show FPS',
                   value: _showFps,
-                  onChanged: (v) => setState(() => _showFps = v),
+                  onChanged: (v) { setState(() => _showFps = v); _save('showFps', v); },
                 ),
               ],
             ),
@@ -66,12 +97,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsToggle(
                   label: 'Sound',
                   value: _soundEnabled,
-                  onChanged: (v) => setState(() => _soundEnabled = v),
+                  onChanged: (v) { setState(() => _soundEnabled = v); _save('soundEnabled', v); },
                 ),
                 _SettingsSlider(
                   label: 'Volume',
                   value: _volume,
-                  onChanged: (v) => setState(() => _volume = v),
+                  onChanged: (v) { setState(() => _volume = v); _save('volume', v); },
                 ),
               ],
             ),
@@ -82,18 +113,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsToggle(
                   label: 'Vibration',
                   value: _vibration,
-                  onChanged: (v) => setState(() => _vibration = v),
+                  onChanged: (v) { setState(() => _vibration = v); _save('vibration', v); },
                 ),
                 _SettingsDropdown(
                   label: 'Button Size',
                   value: _buttonSize,
                   options: const ['Small', 'Medium', 'Large'],
-                  onChanged: (v) => setState(() => _buttonSize = v),
+                  onChanged: (v) { setState(() => _buttonSize = v); _save('buttonSize', v); },
                 ),
                 _SettingsSlider(
                   label: 'Button Opacity',
                   value: _buttonOpacity,
-                  onChanged: (v) => setState(() => _buttonOpacity = v),
+                  onChanged: (v) { setState(() => _buttonOpacity = v); _save('buttonOpacity', v); },
                 ),
               ],
             ),
@@ -104,17 +135,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsToggle(
                   label: 'Debug Mode',
                   value: _debugMode,
-                  onChanged: (v) => setState(() => _debugMode = v),
+                  onChanged: (v) { setState(() => _debugMode = v); _save('debugMode', v); },
                 ),
               ],
             ),
             const SizedBox(height: 24),
             Center(
               child: Text(
-                'Nez v0.1.0 • Zig + Flutter',
+                'NEZ-ZFA v0.1.0 • Zig + Flutter',
                 style: TextStyle(
                   fontSize: 12,
-                  color: NezTheme.textDim.withOpacity(0.5),
+                  color: NezTheme.textDim.withValues(alpha: 0.5),
                 ),
               ),
             ),

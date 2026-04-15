@@ -30,16 +30,18 @@
 
         <!-- Desktop gameplay layout -->
         <DockPanel IsVisible="{Binding !HasError}">
-            <!-- Top toolbar -->
+            <!-- Top toolbar (desktop only) -->
             <Border DockPanel.Dock="Top" Background="#0A0A0F"
+                    IsVisible="{Binding IsDesktop}"
                     BorderBrush="#1A1A2E" BorderThickness="0,0,0,1"
                     Padding="14,0" Height="48">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="10"
                                 VerticalAlignment="Center">
-                        <Button Click="OnBack" Classes="ghost" Padding="8,6" CornerRadius="8">
+                        <Button Click="OnBack" Classes="toolbar" Padding="10,6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="&#x2190;" FontSize="16" Foreground="#8888AA"/>
+                                <PathIcon Data="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"
+                                          Foreground="#8888AA" Width="14" Height="14"/>
                                 <ctrl:KeyBadge Label="Esc"/>
                             </StackPanel>
                         </Button>
@@ -52,22 +54,32 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                 Spacing="6" VerticalAlignment="Center">
                         <Button Click="OnTogglePause" Classes="toolbar">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="&#x23F8;" FontSize="12" Foreground="#A29BFE"/>
-                                <TextBlock Text="Pause" FontSize="12"/>
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <PathIcon Data="M6 19h4V5H6v14zm8-14v14h4V5h-4z"
+                                          Foreground="#A29BFE" Width="12" Height="12"/>
+                                <TextBlock Text="Pause" FontSize="12" VerticalAlignment="Center"/>
                                 <ctrl:KeyBadge Label="Space"/>
                             </StackPanel>
                         </Button>
                         <Button Click="OnFitWindow" Classes="toolbar">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="&#x2922;" FontSize="12" Foreground="#A29BFE"/>
-                                <TextBlock Text="Fit" FontSize="12"/>
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <PathIcon Data="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
+                                          Foreground="#A29BFE" Width="12" Height="12"/>
+                                <TextBlock Text="Fit" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="OnControllers" Classes="toolbar" Name="ControllersBtn">
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <PathIcon Data="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z"
+                                          Foreground="#A29BFE" Width="12" Height="12"/>
+                                <TextBlock Text="Controllers" FontSize="12" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button Click="OnToggleDebug" Classes="toolbar">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="&#x1F41B;" FontSize="11"/>
-                                <TextBlock Text="Debug" FontSize="12"/>
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <PathIcon Data="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5s-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"
+                                          Foreground="#A29BFE" Width="12" Height="12"/>
+                                <TextBlock Text="Debug" FontSize="12" VerticalAlignment="Center"/>
                                 <ctrl:KeyBadge Label="&#x2318;D"/>
                             </StackPanel>
                         </Button>
@@ -77,8 +89,9 @@
                 </DockPanel>
             </Border>
 
-            <!-- Bottom: Keybindings bar -->
+            <!-- Bottom: Keybindings bar (desktop only) -->
             <Border DockPanel.Dock="Bottom" Background="#0A0A0F"
+                    IsVisible="{Binding IsDesktop}"
                     BorderBrush="#1A1A2E" BorderThickness="0,1,0,0"
                     Padding="16,8">
                 <WrapPanel HorizontalAlignment="Center" Orientation="Horizontal">
@@ -125,11 +138,172 @@
                 </StackPanel>
             </Border>
 
-            <!-- Center: NES Display -->
+            <!-- Center: NES Display + Mobile controls -->
             <Panel Background="#000000">
+                <!-- Desktop: full display -->
                 <ctrl:NesDisplay Name="Display"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"/>
+                                  IsVisible="{Binding IsDesktop}"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch"/>
+
+                <!-- ====== Mobile Portrait: TopBar + Game(3*) + Gamepad(2*) ====== -->
+                <Grid Name="MobilePortrait" IsVisible="False"
+                      RowDefinitions="Auto,3*,2*">
+                    <!-- Top bar -->
+                    <Border Grid.Row="0" Background="#0A0A0F" Padding="4,2" Height="32">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Left" Click="OnBack"
+                                    Background="Transparent" BorderThickness="0"
+                                    Padding="8,6" VerticalAlignment="Center">
+                                <TextBlock Text="←" FontSize="16" Foreground="#F0F0F5"/>
+                            </Button>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                        Spacing="2" VerticalAlignment="Center">
+                                <Button Name="MobileSel" Background="Transparent" BorderThickness="0" Padding="6,4">
+                                    <TextBlock Text="SEL" FontSize="9" Foreground="#8888AA" FontWeight="SemiBold"/>
+                                </Button>
+                                <Button Name="MobileStart" Background="Transparent" BorderThickness="0" Padding="6,4">
+                                    <TextBlock Text="START" FontSize="9" Foreground="#8888AA" FontWeight="SemiBold"/>
+                                </Button>
+                                <Border Width="1" Height="14" Background="#2A2A44" Margin="2,0"/>
+                                <Button Click="OnToggleRecord" Background="Transparent" BorderThickness="0" Padding="8,6">
+                                    <Panel Width="14" Height="14">
+                                        <Ellipse Width="14" Height="14" Fill="#FF4444" IsVisible="{Binding IsRecording}"/>
+                                        <Ellipse Width="14" Height="14" Fill="#884444" IsVisible="{Binding !IsRecording}"/>
+                                    </Panel>
+                                </Button>
+                                <Button Click="OnControllers" Background="Transparent" BorderThickness="0" Padding="8,6">
+                                    <PathIcon Data="M3 11h8V3H3v8zm2-6h4v4H5V5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21h8v-8H3v8zm2-6h4v4H5v-4zm13-2h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3z"
+                                              Foreground="#A29BFE" Width="14" Height="14"/>
+                                </Button>
+                                <Button Click="OnTogglePause" Background="Transparent" BorderThickness="0" Padding="8,6">
+                                    <PathIcon Data="M6 19h4V5H6v14zm8-14v14h4V5h-4z"
+                                              Foreground="#F0F0F5" Width="14" Height="14"/>
+                                </Button>
+                            </StackPanel>
+                            <TextBlock Text="{Binding RomName}" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#F0F0F5" HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        </DockPanel>
+                    </Border>
+                    <!-- Game -->
+                    <ctrl:NesDisplay Grid.Row="1" Name="MobileDisplay"
+                                      HorizontalAlignment="Stretch"/>
+                    <!-- Gamepad -->
+                    <ctrl:VirtualGamepad Grid.Row="2" Name="MobileGamepad"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"
+                                          Background="#0A0A0F"/>
+                </Grid>
+
+                <!-- ====== Mobile Landscape: Game fullscreen + transparent overlay ====== -->
+                <Panel Name="MobileLandscape" IsVisible="False">
+                    <!-- Fullscreen game -->
+                    <ctrl:NesDisplay Name="LandscapeDisplay"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Stretch"/>
+                    <!-- Transparent controls overlay: Left joystick | Center bar+SEL/START | Right buttons -->
+                    <Grid ColumnDefinitions="2*,3*,2*">
+                        <!-- Left: Joystick -->
+                        <ctrl:VirtualGamepad Name="LandscapeGamepad"
+                                              Grid.Column="0"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch"/>
+                        <!-- Center: mini bar top + SEL/START bottom -->
+                        <DockPanel Grid.Column="1">
+                            <!-- Mini top bar -->
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal"
+                                        HorizontalAlignment="Center" Spacing="8"
+                                        Margin="0,4,0,0">
+                                <Button Click="OnBack" Background="Transparent" BorderThickness="0" Padding="4,2">
+                                    <TextBlock Text="← Back" FontSize="11" Foreground="#A29BFE"/>
+                                </Button>
+                                <TextBlock Text="{Binding RomName}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="#F0F0F5" VerticalAlignment="Center"/>
+                                <Button Click="OnControllers" Background="Transparent" BorderThickness="0" Padding="4,2">
+                                    <PathIcon Data="M3 11h8V3H3v8zm2-6h4v4H5V5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21h8v-8H3v8zm2-6h4v4H5v-4zm13-2h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3z"
+                                              Foreground="#A29BFE" Width="14" Height="14"/>
+                                </Button>
+                                <Button Click="OnToggleRecord" Background="Transparent" BorderThickness="0" Padding="4,2">
+                                    <Panel Width="14" Height="14">
+                                        <Ellipse Width="14" Height="14" Fill="#FF4444" IsVisible="{Binding IsRecording}"/>
+                                        <Ellipse Width="14" Height="14" Fill="#884444" IsVisible="{Binding !IsRecording}"/>
+                                    </Panel>
+                                </Button>
+                            </StackPanel>
+                            <!-- SEL/START at bottom center -->
+                            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                                        HorizontalAlignment="Center" Spacing="16"
+                                        Margin="0,0,0,6">
+                                <Button Name="LandscapeSel" Background="Transparent" BorderThickness="0" Padding="6,3">
+                                    <TextBlock Text="SEL" FontSize="9" Foreground="#8888AA" FontWeight="SemiBold"/>
+                                </Button>
+                                <Button Name="LandscapeStart" Background="Transparent" BorderThickness="0" Padding="6,3">
+                                    <TextBlock Text="START" FontSize="9" Foreground="#8888AA" FontWeight="SemiBold"/>
+                                </Button>
+                            </StackPanel>
+                            <Panel/>
+                        </DockPanel>
+                        <!-- Right: Action buttons only -->
+                        <ctrl:VirtualGamepad Name="LandscapeButtons"
+                                              Grid.Column="2"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch"/>
+                    </Grid>
+                </Panel>
+
+                <!-- QR Overlay -->
+                <Border Name="QrOverlay" IsVisible="False"
+                        Background="#EE000000"
+                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <Panel>
+                        <!-- Close button top-right -->
+                        <Button Click="OnCloseQrOverlay"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,8,12,0" Padding="8,4" CornerRadius="8"
+                                Background="#2A2A44" BorderThickness="0">
+                            <TextBlock Text="✕" FontSize="16" Foreground="#F0F0F5"/>
+                        </Button>
+                        <!-- QR content centered -->
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Spacing="12">
+                            <TextBlock Text="Scan to Connect"
+                                       FontSize="16" FontWeight="SemiBold"
+                                       Foreground="#F0F0F5" HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Spacing="24"
+                                        HorizontalAlignment="Center">
+                                <!-- P1 QR -->
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Background="White" CornerRadius="6"
+                                            Padding="6" HorizontalAlignment="Center">
+                                        <Image Name="QrImageP1" Width="120" Height="120"
+                                               RenderOptions.BitmapInterpolationMode="None"/>
+                                    </Border>
+                                    <TextBlock Text="P1" FontSize="12"
+                                               FontWeight="Bold" Foreground="#A29BFE"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Name="QrUrlP1" FontSize="8"
+                                               Foreground="#666688"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <!-- P2 QR -->
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border Background="White" CornerRadius="6"
+                                            Padding="6" HorizontalAlignment="Center">
+                                        <Image Name="QrImageP2" Width="120" Height="120"
+                                               RenderOptions.BitmapInterpolationMode="None"/>
+                                    </Border>
+                                    <TextBlock Text="P2" FontSize="12"
+                                               FontWeight="Bold" Foreground="#FF6B6B"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Name="QrUrlP2" FontSize="8"
+                                               Foreground="#666688"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Panel>
+                </Border>
             </Panel>
         </DockPanel>
     </Panel>

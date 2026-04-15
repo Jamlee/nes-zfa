@@ -1,15 +1,19 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
 using NezAvalonia.Core;
 using System;
 
 namespace NezAvalonia.Controls;
 
+public enum GamepadMode { Full, JoystickOnly, ButtonsOnly }
+
 /// <summary>
 /// Virtual gamepad for touch/mobile input.
-/// Mirrors the Flutter VirtualGamepad: D-Pad (joystick) + A/B + Turbo + Select/Start.
+/// Landscape layout: Left joystick | Center SELECT/START | Right A/B/TA/TB diamond.
+/// Matches Flutter VirtualGamepad layout.
 /// </summary>
 public class VirtualGamepad : UserControl
 {
@@ -17,226 +21,205 @@ public class VirtualGamepad : UserControl
     public event Action<bool>? TurboAChanged;
     public event Action<bool>? TurboBChanged;
 
+    public static readonly StyledProperty<GamepadMode> ModeProperty =
+        AvaloniaProperty.Register<VirtualGamepad, GamepadMode>(nameof(Mode), GamepadMode.Full);
+
+    public GamepadMode Mode
+    {
+        get => GetValue(ModeProperty);
+        set => SetValue(ModeProperty, value);
+    }
+
     public VirtualGamepad()
     {
-        var root = new Grid
-        {
-            RowDefinitions = RowDefinitions.Parse("3*,*"),
-        };
+        // Build UI on loaded to respect Mode property
+    }
 
-        // Row 0: D-Pad (left) + Action buttons (right)
-        var mainRow = new Grid
+    protected override void OnLoaded(Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
+        BuildUI();
+    }
+
+    private void BuildUI()
+    {
+        var mode = Mode;
+
+        if (mode == GamepadMode.JoystickOnly)
+        {
+            var joystick = new JoystickControl { Width = 150, Height = 150 };
+            joystick.DirectionChanged += (up, down, left, right) =>
+            {
+                ButtonChanged?.Invoke(NezBindings.ButtonUp, up);
+                ButtonChanged?.Invoke(NezBindings.ButtonDown, down);
+                ButtonChanged?.Invoke(NezBindings.ButtonLeft, left);
+                ButtonChanged?.Invoke(NezBindings.ButtonRight, right);
+            };
+            Content = new Panel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { joystick },
+            };
+            return;
+        }
+
+        if (mode == GamepadMode.ButtonsOnly)
+        {
+            Content = new Panel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { CreateDiamondButtons() },
+            };
+            return;
+        }
+
+        // Full mode: joystick left, buttons right
+        var root = new Grid
         {
             ColumnDefinitions = ColumnDefinitions.Parse("*,*"),
         };
 
-        var joystick = new JoystickControl();
-        joystick.DirectionChanged += (up, down, left, right) =>
+        var joy = new JoystickControl { Width = 150, Height = 150 };
+        joy.DirectionChanged += (up, down, left, right) =>
         {
             ButtonChanged?.Invoke(NezBindings.ButtonUp, up);
             ButtonChanged?.Invoke(NezBindings.ButtonDown, down);
             ButtonChanged?.Invoke(NezBindings.ButtonLeft, left);
             ButtonChanged?.Invoke(NezBindings.ButtonRight, right);
         };
-        mainRow.Children.Add(joystick);
-        Grid.SetColumn(joystick, 0);
-
-        var actionPanel = CreateActionButtons();
-        mainRow.Children.Add(actionPanel);
-        Grid.SetColumn(actionPanel, 1);
-
-        root.Children.Add(mainRow);
-        Grid.SetRow(mainRow, 0);
-
-        // Row 1: System buttons (Select, Start)
-        var systemRow = new StackPanel
+        var leftPanel = new Panel
         {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            Spacing = 24,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(16, 0, 0, 0),
+            Children = { joy },
         };
+        root.Children.Add(leftPanel);
+        Grid.SetColumn(leftPanel, 0);
 
-        systemRow.Children.Add(CreateSystemButton("SELECT", NezBindings.ButtonSelect));
-        systemRow.Children.Add(CreateSystemButton("START", NezBindings.ButtonStart));
-
-        root.Children.Add(systemRow);
-        Grid.SetRow(systemRow, 1);
+        var actionPanel = CreateDiamondButtons();
+        var rightPanel = new Panel
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 16, 0),
+            Children = { actionPanel },
+        };
+        root.Children.Add(rightPanel);
+        Grid.SetColumn(rightPanel, 1);
 
         Content = root;
     }
 
-    private Panel CreateActionButtons()
+    /// <summary>
+    /// Diamond layout: TA top, TB left, A right, B bottom.
+    /// Matches Flutter _ActionButtons with offset=52, btnSize=56.
+    /// </summary>
+    private Panel CreateDiamondButtons()
     {
-        var grid = new Grid
+        const double btnSize = 56;
+        const double offset = 52;
+        const double areaSize = btnSize + offset * 2; // 160
+        double center = areaSize / 2;
+        double half = btnSize / 2;
+
+        var canvas = new Canvas
         {
-            RowDefinitions = RowDefinitions.Parse("*,*"),
-            ColumnDefinitions = ColumnDefinitions.Parse("*,*"),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            Width = 140,
-            Height = 120,
+            Width = areaSize,
+            Height = areaSize,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
         };
 
-        // Turbo B (row 0, col 0)
-        var turboB = CreateTurboButton("B", NezTheme.AccentRed, false);
-        grid.Children.Add(turboB);
-        Grid.SetRow(turboB, 0);
-        Grid.SetColumn(turboB, 0);
+        // TA - top
+        var ta = CreateRoundButton("TA", btnSize, Color.Parse("#FF8A80"), true);
+        Canvas.SetLeft(ta, center - half);
+        Canvas.SetTop(ta, center - offset - half);
+        ta.PointerPressed += (_, _) => TurboAChanged?.Invoke(true);
+        ta.PointerReleased += (_, _) => TurboAChanged?.Invoke(false);
+        ta.PointerCaptureLost += (_, _) => TurboAChanged?.Invoke(false);
+        canvas.Children.Add(ta);
 
-        // Turbo A (row 0, col 1)
-        var turboA = CreateTurboButton("A", NezTheme.AccentPrimary, true);
-        grid.Children.Add(turboA);
-        Grid.SetRow(turboA, 0);
-        Grid.SetColumn(turboA, 1);
+        // B - bottom
+        var b = CreateRoundButton("B", btnSize, Color.Parse("#FFA726"), false);
+        Canvas.SetLeft(b, center - half);
+        Canvas.SetTop(b, center + offset - half);
+        b.PointerPressed += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonB, true);
+        b.PointerReleased += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonB, false);
+        b.PointerCaptureLost += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonB, false);
+        canvas.Children.Add(b);
 
-        // B button (row 1, col 0)
-        var btnB = CreateActionButton("B", NezTheme.AccentRed, NezBindings.ButtonB);
-        grid.Children.Add(btnB);
-        Grid.SetRow(btnB, 1);
-        Grid.SetColumn(btnB, 0);
+        // TB - left
+        var tb = CreateRoundButton("TB", btnSize, Color.Parse("#FFCC80"), true);
+        Canvas.SetLeft(tb, center - offset - half);
+        Canvas.SetTop(tb, center - half);
+        tb.PointerPressed += (_, _) => TurboBChanged?.Invoke(true);
+        tb.PointerReleased += (_, _) => TurboBChanged?.Invoke(false);
+        tb.PointerCaptureLost += (_, _) => TurboBChanged?.Invoke(false);
+        canvas.Children.Add(tb);
 
-        // A button (row 1, col 1)
-        var btnA = CreateActionButton("A", NezTheme.AccentPrimary, NezBindings.ButtonA);
-        grid.Children.Add(btnA);
-        Grid.SetRow(btnA, 1);
-        Grid.SetColumn(btnA, 1);
+        // A - right
+        var a = CreateRoundButton("A", btnSize, Color.Parse("#EF5350"), false);
+        Canvas.SetLeft(a, center + offset - half);
+        Canvas.SetTop(a, center - half);
+        a.PointerPressed += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonA, true);
+        a.PointerReleased += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonA, false);
+        a.PointerCaptureLost += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonA, false);
+        canvas.Children.Add(a);
 
-        return grid;
+        return canvas;
     }
 
-    private Control CreateActionButton(string label, Color color, int buttonIndex)
+    private static Border CreateRoundButton(string label, double size, Color color, bool outline)
     {
         var border = new Border
         {
-            Width = 56,
-            Height = 56,
-            CornerRadius = new CornerRadius(28),
-            Background = new SolidColorBrush(color),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Width = size,
+            Height = size,
+            CornerRadius = new CornerRadius(size / 2),
+            Background = outline
+                ? Brushes.Transparent
+                : new SolidColorBrush(color),
+            BorderBrush = new SolidColorBrush(color),
+            BorderThickness = new Thickness(outline ? 2.5 : 0),
             Child = new TextBlock
             {
                 Text = label,
-                FontSize = 18,
+                FontSize = label.Length > 1 ? 14 : 18,
                 FontWeight = FontWeight.Bold,
-                Foreground = Brushes.White,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                Foreground = outline ? new SolidColorBrush(color) : Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
             },
             BoxShadow = new BoxShadows(new BoxShadow
             {
-                Color = Color.FromArgb(100, color.R, color.G, color.B),
-                Blur = 12,
+                Color = Color.FromArgb(80, color.R, color.G, color.B),
+                Blur = 10,
             }),
         };
-
-        border.PointerPressed += (_, _) => ButtonChanged?.Invoke(buttonIndex, true);
-        border.PointerReleased += (_, _) => ButtonChanged?.Invoke(buttonIndex, false);
-        border.PointerCaptureLost += (_, _) => ButtonChanged?.Invoke(buttonIndex, false);
-
         return border;
     }
 
-    private Control CreateTurboButton(string label, Color color, bool isA)
-    {
-        var border = new Border
-        {
-            Width = 44,
-            Height = 44,
-            CornerRadius = new CornerRadius(22),
-            Background = Brushes.Transparent,
-            BorderBrush = new SolidColorBrush(color),
-            BorderThickness = new Thickness(2),
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            Child = new StackPanel
-            {
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "TURBO",
-                        FontSize = 6,
-                        Foreground = new SolidColorBrush(color),
-                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    },
-                    new TextBlock
-                    {
-                        Text = label,
-                        FontSize = 14,
-                        FontWeight = FontWeight.Bold,
-                        Foreground = new SolidColorBrush(color),
-                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    }
-                }
-            }
-        };
-
-        border.PointerPressed += (_, _) =>
-        {
-            if (isA) TurboAChanged?.Invoke(true);
-            else TurboBChanged?.Invoke(true);
-            border.Background = new SolidColorBrush(Color.FromArgb(50, color.R, color.G, color.B));
-        };
-        border.PointerReleased += (_, _) =>
-        {
-            if (isA) TurboAChanged?.Invoke(false);
-            else TurboBChanged?.Invoke(false);
-            border.Background = Brushes.Transparent;
-        };
-
-        return border;
-    }
-
-    private Control CreateSystemButton(string label, int buttonIndex)
-    {
-        var border = new Border
-        {
-            Padding = new Thickness(20, 8),
-            CornerRadius = new CornerRadius(20),
-            Background = NezTheme.BgSurfaceBrush,
-            BorderBrush = NezTheme.BorderBrush,
-            BorderThickness = new Thickness(1),
-            Child = new TextBlock
-            {
-                Text = label,
-                FontSize = 11,
-                Foreground = NezTheme.TextDimBrush,
-                LetterSpacing = 2,
-                FontWeight = FontWeight.SemiBold,
-            }
-        };
-
-        border.PointerPressed += (_, _) => ButtonChanged?.Invoke(buttonIndex, true);
-        border.PointerReleased += (_, _) => ButtonChanged?.Invoke(buttonIndex, false);
-
-        return border;
-    }
 }
 
 /// <summary>
-/// Virtual joystick D-Pad with angle-based direction detection.
-/// Mirrors Flutter _Joystick widget.
+/// Virtual joystick with angle-based direction detection.
 /// </summary>
 public class JoystickControl : Control
 {
     private Point _thumbOffset;
     private bool _isDragging;
-    private const double Size = 120;
-    private const double ThumbRadius = 25;
+    private const double ThumbRadius = 28;
     private const double DeadZone = 0.25;
 
-    public event Action<bool, bool, bool, bool>? DirectionChanged; // up, down, left, right
+    public event Action<bool, bool, bool, bool>? DirectionChanged;
 
     public JoystickControl()
     {
-        Width = Size;
-        Height = Size;
-        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
-        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+        HorizontalAlignment = HorizontalAlignment.Center;
+        VerticalAlignment = VerticalAlignment.Center;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -251,9 +234,7 @@ public class JoystickControl : Control
     {
         base.OnPointerMoved(e);
         if (_isDragging)
-        {
             UpdateThumb(e.GetPosition(this));
-        }
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -267,11 +248,11 @@ public class JoystickControl : Control
 
     private void UpdateThumb(Point pos)
     {
-        double cx = Size / 2;
-        double cy = Size / 2;
+        double cx = Bounds.Width / 2;
+        double cy = Bounds.Height / 2;
         double dx = pos.X - cx;
         double dy = pos.Y - cy;
-        double maxDist = Size / 2 - ThumbRadius;
+        double maxDist = Math.Min(cx, cy) - ThumbRadius;
 
         double dist = Math.Sqrt(dx * dx + dy * dy);
         if (dist > maxDist)
@@ -284,7 +265,6 @@ public class JoystickControl : Control
         _thumbOffset = new Point(dx, dy);
         InvalidateVisual();
 
-        // Direction detection (angle-based, matching Flutter)
         double normalized = dist / maxDist;
         if (normalized < DeadZone)
         {
@@ -304,28 +284,33 @@ public class JoystickControl : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        double cx = Size / 2;
-        double cy = Size / 2;
-        double baseRadius = Size / 2 - 4;
+        double cx = Bounds.Width / 2;
+        double cy = Bounds.Height / 2;
+        double baseRadius = Math.Min(cx, cy) - 4;
 
-        // Base circle
-        context.DrawEllipse(null, new Pen(NezTheme.BorderBrush, 2),
+        // Base ring
+        var ringBrush = new SolidColorBrush(Color.Parse("#2A2A44"));
+        context.DrawEllipse(null, new Pen(ringBrush, 2.5),
             new Point(cx, cy), baseRadius, baseRadius);
 
-        // Direction indicators (4 dots)
-        var dotBrush = NezTheme.TextDimBrush;
+        // Inner subtle fill
+        var fillBrush = new SolidColorBrush(Color.FromArgb(15, 255, 255, 255));
+        context.DrawEllipse(fillBrush, null,
+            new Point(cx, cy), baseRadius, baseRadius);
+
+        // Direction dots
+        var dotBrush = new SolidColorBrush(Color.Parse("#444466"));
         double dotR = 3;
-        double offset = baseRadius - 10;
-        context.DrawEllipse(dotBrush, null, new Point(cx, cy - offset), dotR, dotR); // N
-        context.DrawEllipse(dotBrush, null, new Point(cx, cy + offset), dotR, dotR); // S
-        context.DrawEllipse(dotBrush, null, new Point(cx - offset, cy), dotR, dotR); // W
-        context.DrawEllipse(dotBrush, null, new Point(cx + offset, cy), dotR, dotR); // E
+        double off = baseRadius - 12;
+        context.DrawEllipse(dotBrush, null, new Point(cx, cy - off), dotR, dotR);
+        context.DrawEllipse(dotBrush, null, new Point(cx, cy + off), dotR, dotR);
+        context.DrawEllipse(dotBrush, null, new Point(cx - off, cy), dotR, dotR);
+        context.DrawEllipse(dotBrush, null, new Point(cx + off, cy), dotR, dotR);
 
         // Thumb
-        var thumbColor = _isDragging ? NezTheme.AccentPrimary : NezTheme.BgElevated;
+        var thumbColor = _isDragging ? Color.Parse("#6C5CE7") : Color.Parse("#333355");
         var thumbBrush = new SolidColorBrush(thumbColor);
         var thumbCenter = new Point(cx + _thumbOffset.X, cy + _thumbOffset.Y);
-
         context.DrawEllipse(thumbBrush, new Pen(Brushes.White, 1.5),
             thumbCenter, ThumbRadius, ThumbRadius);
     }

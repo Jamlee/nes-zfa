@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="using:NezAvalonia.Views"
         x:Class="NezAvalonia.MainWindow"
-        Title="Nez" Width="1000" Height="700"
+        Title="NEZ-ZFA" Width="1000" Height="700"
         MinWidth="400" MinHeight="500"
         Background="#0A0A0F">
 

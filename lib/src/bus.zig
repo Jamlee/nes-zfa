@@ -63,6 +63,7 @@ pub const NESBus = struct {
     cart: *Cart,
     allocator: Allocator,
     controller: *Gamepad,
+    controller2: *Gamepad,
 
     // holds a reference to the CPU's 0x800 bytes of RAM.
     ram: [w_ram_size]u8 = .{0} ** w_ram_size,
@@ -75,7 +76,8 @@ pub const NESBus = struct {
             0x2000...0x3FFF => self.ppu.readRegister(addr),
             0x4000...0x4015 => 0, // TODO
             0x4016 => self.controller.read(),
-            0x4017...0x401F => 0, // TODO
+            0x4017 => self.controller2.read(),
+            0x4018...0x401F => 0, // TODO
             else => self.mapper.read(addr),
         };
     }
@@ -116,7 +118,10 @@ pub const NESBus = struct {
             0x4013 => {},
             0x4014 => self.ppu.writeOAMDMA(val),
             0x4015 => {},
-            0x4016 => self.controller.write(val),
+            0x4016 => {
+                self.controller.write(val);
+                self.controller2.write(val);
+            },
             0x4017 => self.apu.writeFrameCounter(val),
             0x4018...0x401F => {}, // TODO
             else => self.mapper.write(addr, val),
@@ -149,7 +154,7 @@ pub const NESBus = struct {
 
     /// Create a new Bus.
     /// Both `cart` and `ppu` are non-owning pointers.
-    pub fn init(allocator: Allocator, cart: *Cart, apu: *APU, ppu: *PPU, controller: *Gamepad) !Self {
+    pub fn init(allocator: Allocator, cart: *Cart, apu: *APU, ppu: *PPU, controller: *Gamepad, controller2: *Gamepad) !Self {
         return .{
             .allocator = allocator,
             .cart = cart,
@@ -161,6 +166,7 @@ pub const NESBus = struct {
             },
             .mapper = try createMapper(allocator, cart, ppu),
             .controller = controller,
+            .controller2 = controller2,
         };
     }
 

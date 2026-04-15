@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -20,6 +21,9 @@ public partial class GameplayViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private bool _showDebugPanel;
+
+    [ObservableProperty]
+    private bool _isDesktop = true;
 
     [ObservableProperty]
     private bool _hasError;
@@ -100,11 +104,33 @@ public partial class GameplayViewModel : ObservableObject, IDisposable
         return false;
     }
 
+    [ObservableProperty]
+    private bool _isRecording;
+
     [RelayCommand]
     private void TogglePause() => _engine.TogglePause();
 
     [RelayCommand]
     private void ToggleDebug() => ShowDebugPanel = !ShowDebugPanel;
+
+    [ObservableProperty]
+    private string? _statusMessage;
+
+    [RelayCommand]
+    private async Task ToggleRecord()
+    {
+        if (_engine.IsRecording)
+        {
+            IsRecording = false;
+            var path = await _engine.StopRecording();
+            System.Diagnostics.Debug.WriteLine($"NEZ: GIF saved: {path}");
+        }
+        else
+        {
+            _engine.StartRecording();
+            IsRecording = true;
+        }
+    }
 
     public void Dispose()
     {

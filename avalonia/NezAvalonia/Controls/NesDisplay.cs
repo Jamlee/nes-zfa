@@ -68,7 +68,7 @@ public class NesDisplay : Control
             }
 
             double x = (bounds.Width - drawW) / 2;
-            double y = (bounds.Height - drawH) / 2;
+            double y = 0; // Top-aligned, no gap above game
 
             var sourceRect = new Rect(0, 0, srcW, srcH);
             var destRect = new Rect(x, y, drawW, drawH);
@@ -119,12 +119,23 @@ public class NesDisplay : Control
 
     protected override Size MeasureOverride(Size availableSize)
     {
+        const double aspect = 256.0 / 240.0;
+
         if (double.IsInfinity(availableSize.Width) && double.IsInfinity(availableSize.Height))
             return new Size(512, 480);
         if (double.IsInfinity(availableSize.Width))
-            return new Size(availableSize.Height * 256.0 / 240.0, availableSize.Height);
+            return new Size(availableSize.Height * aspect, availableSize.Height);
         if (double.IsInfinity(availableSize.Height))
-            return new Size(availableSize.Width, availableSize.Width * 240.0 / 256.0);
-        return availableSize;
+            return new Size(availableSize.Width, availableSize.Width / aspect);
+
+        // Both constrained: fit within bounds preserving aspect ratio
+        double fitW = availableSize.Width;
+        double fitH = fitW / aspect;
+        if (fitH > availableSize.Height)
+        {
+            fitH = availableSize.Height;
+            fitW = fitH * aspect;
+        }
+        return new Size(fitW, fitH);
     }
 }

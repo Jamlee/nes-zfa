@@ -80,6 +80,15 @@ public static class NezBindings
     public static extern void InputSetButton(IntPtr console, byte index,
         [MarshalAs(UnmanagedType.I1)] bool pressed);
 
+    // --- Input P2 ---
+
+    [DllImport(LibName, EntryPoint = "nez_input_set_buttons_p2")]
+    public static extern void InputSetButtonsP2(IntPtr console, byte bitmask);
+
+    [DllImport(LibName, EntryPoint = "nez_input_set_button_p2")]
+    public static extern void InputSetButtonP2(IntPtr console, byte index,
+        [MarshalAs(UnmanagedType.I1)] bool pressed);
+
     // --- Pause ---
 
     [DllImport(LibName, EntryPoint = "nez_is_paused")]

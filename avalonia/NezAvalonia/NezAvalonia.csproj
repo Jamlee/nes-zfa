@@ -4,11 +4,19 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Memory: use Workstation GC (lower memory) -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <GarbageCollectionAdaptationMode>0</GarbageCollectionAdaptationMode>
+    <!-- NativeAOT for desktop -->
+    <PublishAot Condition="'$(TargetFramework)' == 'net10.0'">true</PublishAot>
+    <StripSymbols Condition="'$(TargetFramework)' == 'net10.0'">true</StripSymbols>
     <!-- Desktop only -->
     <OutputType Condition="'$(TargetFramework)' == 'net10.0'">WinExe</OutputType>
     <ApplicationManifest Condition="'$(TargetFramework)' == 'net10.0'">app.manifest</ApplicationManifest>
     <!-- Android only -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">23</SupportedOSPlatformVersion>
+    <AndroidSdkVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">34</AndroidSdkVersion>
     <OutputType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">Exe</OutputType>
     <ApplicationId Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">com.nez.nez_avalonia</ApplicationId>
     <ApplicationVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">1</ApplicationVersion>
@@ -17,15 +25,21 @@
     <AndroidKeyStore Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">false</AndroidKeyStore>
     <AndroidSigningKeyStore Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'"></AndroidSigningKeyStore>
     <DefineConstants Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">$(DefineConstants);ANDROID</DefineConstants>
+    <AndroidManifestMerger Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">legacy</AndroidManifestMerger>
   </PropertyGroup>
+
+  <!-- Android permissions -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <AndroidManifestOverlay Include="AndroidManifestOverlay.xml" />
+  </ItemGroup>
 
   <!-- Shared packages -->
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.0.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.1" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
   <!-- Desktop packages -->
@@ -67,5 +81,11 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <Compile Remove="MainActivity.cs" />
     <Compile Remove="SplashActivity.cs" />
+    <Compile Remove="NezApplication.cs" />
+  </ItemGroup>
+
+  <!-- Bundle ROMs as embedded resources -->
+  <ItemGroup>
+    <EmbeddedResource Include="roms\*.nes" />
   </ItemGroup>
 </Project>

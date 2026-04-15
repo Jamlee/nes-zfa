@@ -14,9 +14,15 @@ namespace NezAvalonia.ViewModels;
 
 public partial class LibraryViewModel : ObservableObject
 {
-    private static readonly string SavePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "NezAvalonia", "rom_library.json");
+    private static string GetSavePath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (string.IsNullOrEmpty(appData))
+            appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrEmpty(appData))
+            appData = Path.GetTempPath();
+        return Path.Combine(appData, "NezAvalonia", "rom_library.json");
+    }
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
@@ -27,6 +33,7 @@ public partial class LibraryViewModel : ObservableObject
     public LibraryViewModel()
     {
         LoadSavedRoms();
+        _ = LoadBundledRoms();
     }
 
     partial void OnSearchQueryChanged(string value)
@@ -91,9 +98,9 @@ public partial class LibraryViewModel : ObservableObject
     {
         try
         {
-            if (!File.Exists(SavePath)) return;
-            var json = File.ReadAllText(SavePath);
-            var entries = JsonSerializer.Deserialize<RomEntry[]>(json);
+            if (!File.Exists(GetSavePath())) return;
+            var json = File.ReadAllText(GetSavePath());
+            var entries = JsonSerializer.Deserialize(json, RomJsonContext.Default.RomEntryArray);
             if (entries == null) return;
 
             foreach (var entry in entries)
@@ -109,19 +116,39 @@ public partial class LibraryViewModel : ObservableObject
         }
     }
 
+    private async Task LoadBundledRoms()
+    {
+        // Only auto-add bundled ROMs if library is empty (first launch)
+        if (Roms.Count > 0) return;
+
+        try
+        {
+            var paths = await Core.BundledRomManager.EnsureBundledRoms();
+            var added = false;
+            foreach (var path in paths)
+            {
+                if (Roms.Any(r => r.Path == path)) continue;
+                AddRom(path);
+                added = true;
+            }
+            if (added) SaveRoms();
+        }
+        catch
+        {
+            // Ignore bundled ROM errors
+        }
+    }
+
     private void SaveRoms()
     {
         try
         {
-            var dir = Path.GetDirectoryName(SavePath)!;
+            var dir = Path.GetDirectoryName(GetSavePath())!;
             if (!Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            var json = JsonSerializer.Serialize(Roms.ToArray(), new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
-            File.WriteAllText(SavePath, json);
+            var json = JsonSerializer.Serialize(Roms.ToArray(), RomJsonContext.Default.RomEntryArray);
+            File.WriteAllText(GetSavePath(), json);
         }
         catch
         {
@@ -148,3 +175,8 @@ public class RomEntry : ObservableObject
     [JsonIgnore]
     public string SizeText => Exists ? $"{SizeKB} KB" : "File missing";
 }
+
+// NativeAOT-compatible JSON source generator
+[JsonSerializable(typeof(RomEntry[]))]
+[JsonSourceGenerationOptions(WriteIndented = true)]
+internal partial class RomJsonContext : JsonSerializerContext { }

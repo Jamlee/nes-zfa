@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -14,14 +15,30 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        // Prevent crash from unhandled exceptions
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
-            desktop.MainWindow = new MainWindow();
+            Console.Error.WriteLine($"NEZ FATAL: {args.ExceptionObject}");
+        };
+
+        try
+        {
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.MainWindow = new MainWindow();
+            }
+            else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+            {
+                var view = new MainView();
+                singleView.MainView = view;
+                // On Android (SingleView lifetime), switch to mobile layout
+                if (view.DataContext is ViewModels.MainViewModel vm)
+                    vm.IsDesktop = false;
+            }
         }
-        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+        catch (Exception ex)
         {
-            // Android: use UserControl, not Window
-            singleView.MainView = new MainView();
+            Console.Error.WriteLine($"NEZ INIT ERROR: {ex}");
         }
 
         base.OnFrameworkInitializationCompleted();

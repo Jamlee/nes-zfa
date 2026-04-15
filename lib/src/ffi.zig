@@ -174,6 +174,19 @@ export fn nez_input_set_buttons(console_ptr: ?*NezConsole, button_state: u8) cal
     }
 }
 
+export fn nez_input_set_buttons_p2(console_ptr: ?*NezConsole, button_state: u8) callconv(.c) void {
+    if (console_ptr) |ptr| {
+        const cons: *nes.Console = @ptrCast(@alignCast(ptr));
+
+        var buttons: [8]bool = undefined;
+        for (0..8) |i| {
+            buttons[i] = (button_state & (@as(u8, 1) << @intCast(i))) != 0;
+        }
+
+        cons.controller2.setInputs(buttons);
+    }
+}
+
 export fn nez_input_set_button(
     console_ptr: ?*NezConsole,
     button_index: u8,
@@ -183,6 +196,19 @@ export fn nez_input_set_button(
         const cons: *nes.Console = @ptrCast(@alignCast(ptr));
         if (button_index < 8) {
             cons.controller.buttons[button_index] = pressed;
+        }
+    }
+}
+
+export fn nez_input_set_button_p2(
+    console_ptr: ?*NezConsole,
+    button_index: u8,
+    pressed: bool,
+) callconv(.c) void {
+    if (console_ptr) |ptr| {
+        const cons: *nes.Console = @ptrCast(@alignCast(ptr));
+        if (button_index < 8) {
+            cons.controller2.buttons[button_index] = pressed;
         }
     }
 }

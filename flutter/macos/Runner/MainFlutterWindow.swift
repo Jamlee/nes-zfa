@@ -16,7 +16,7 @@ class MainFlutterWindow: NSWindow {
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
     self.minSize = NSSize(width: 800, height: 600)
-    self.title = "Nez"
+    self.title = "NEZ-ZFA"
 
     // Method channel for window control
     let channel = FlutterMethodChannel(name: "com.nez/window",

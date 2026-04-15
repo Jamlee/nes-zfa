@@ -20,11 +20,12 @@ class MainActivity : FlutterActivity() {
                 "start" -> {
                     try {
                         val sampleRate = 44100
-                        val bufferSize = AudioTrack.getMinBufferSize(
+                        val minBufferSize = AudioTrack.getMinBufferSize(
                             sampleRate,
                             AudioFormat.CHANNEL_OUT_MONO,
                             AudioFormat.ENCODING_PCM_16BIT
                         )
+                        val bufferSize = minBufferSize * 4
                         audioTrack = AudioTrack.Builder()
                             .setAudioAttributes(
                                 AudioAttributes.Builder()
@@ -41,6 +42,7 @@ class MainActivity : FlutterActivity() {
                             )
                             .setBufferSizeInBytes(bufferSize)
                             .setTransferMode(AudioTrack.MODE_STREAM)
+                            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
                             .build()
                         audioTrack?.play()
                         result.success(null)
@@ -61,7 +63,7 @@ class MainActivity : FlutterActivity() {
                 "pushSamples" -> {
                     try {
                         val bytes = call.arguments as ByteArray
-                        audioTrack?.write(bytes, 0, bytes.size)
+                        audioTrack?.write(bytes, 0, bytes.size, AudioTrack.WRITE_NON_BLOCKING)
                         result.success(null)
                     } catch (e: Exception) {
                         result.error("AUDIO_ERROR", "Failed to push samples: ${e.message}", null)

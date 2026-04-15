@@ -1,24 +1,34 @@
 ﻿using Avalonia;
+using SixLabors.ImageSharp;
 using System;
+using System.Runtime;
 
 namespace NezAvalonia;
 
 class Program
 {
-    // Initialization code. Don't use any Avalonia, third-party APIs or any
-    // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-    // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        // Aggressive memory optimization
+        GCSettings.LatencyMode = GCLatencyMode.Batch;
+        AppContext.SetSwitch("System.Runtime.TieredCompilation.QuickJit", true);
 
-    // Avalonia configuration, don't remove; also used by visual designer.
+        // Compact heap on startup
+        GC.Collect(2, GCCollectionMode.Aggressive, true, true);
+        GC.WaitForPendingFinalizers();
+
+        // Limit ImageSharp memory
+        Configuration.Default.MemoryAllocator = new SixLabors.ImageSharp.Memory.SimpleGcMemoryAllocator();
+
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
 #if DEBUG
             .WithDeveloperTools()
 #endif
-            .WithInterFont()
             .LogToTrace();
 }

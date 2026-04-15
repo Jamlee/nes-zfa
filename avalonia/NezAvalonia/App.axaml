@@ -7,11 +7,6 @@
         <FluentTheme />
 
         <!-- ============ Global Dark Theme ============ -->
-        <Style Selector="Window">
-            <Setter Property="Background" Value="#0A0A0F"/>
-            <Setter Property="FontFamily" Value="Inter, San Francisco, Segoe UI, sans-serif"/>
-        </Style>
-
         <Style Selector="TextBlock">
             <Setter Property="Foreground" Value="#F0F0F5"/>
         </Style>
@@ -30,7 +25,17 @@
             <Setter Property="BorderThickness" Value="1.5"/>
         </Style>
 
-        <!-- ============ Buttons ============ -->
+        <!-- Search TextBox: no inner focus border (outer Border handles it) -->
+        <Style Selector="TextBox.search-input">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBox.search-input:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <!-- ============ Buttons (no Cursor — not available on Android) ============ -->
         <Style Selector="Button">
             <Setter Property="Background" Value="#222240"/>
             <Setter Property="Foreground" Value="#F0F0F5"/>
@@ -38,7 +43,6 @@
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Padding" Value="16,10"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <BrushTransition Property="Background" Duration="0:0:0.15"/>
@@ -68,9 +72,44 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="12,10"/>
             <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="MinHeight" Value="40"/>
         </Style>
         <Style Selector="Button.sidebar-item:pointerover">
             <Setter Property="Background" Value="#1A1A2E"/>
+        </Style>
+        <Style Selector="Button.sidebar-item-active">
+            <Setter Property="Background" Value="#1A1A2E"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="MinHeight" Value="40"/>
+        </Style>
+        <Style Selector="Button.sidebar-item-active:pointerover">
+            <Setter Property="Background" Value="#222240"/>
+        </Style>
+
+        <!-- Mobile bottom nav -->
+        <Style Selector="Button.mobile-nav">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Foreground" Value="#555577"/>
+            <Setter Property="MinHeight" Value="52"/>
+        </Style>
+        <Style Selector="Button.mobile-nav:pointerover">
+            <Setter Property="Background" Value="#1A1A2E"/>
+        </Style>
+        <Style Selector="Button.mobile-nav-active">
+            <Setter Property="Background" Value="#1A1A2E"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Foreground" Value="#A29BFE"/>
+            <Setter Property="MinHeight" Value="52"/>
+        </Style>
+        <Style Selector="Button.mobile-nav-active:pointerover">
+            <Setter Property="Background" Value="#222240"/>
         </Style>
 
         <Style Selector="Button.ghost">
@@ -84,9 +123,12 @@
         <Style Selector="Button.toolbar">
             <Setter Property="Background" Value="#1A1A2E"/>
             <Setter Property="BorderBrush" Value="#2A2A44"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,6"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
         <Style Selector="Button.toolbar:pointerover">
             <Setter Property="Background" Value="#222240"/>

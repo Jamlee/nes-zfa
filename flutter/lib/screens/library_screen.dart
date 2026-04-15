@@ -162,37 +162,42 @@ class _LibraryScreenState extends State<LibraryScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
-        dialogTitle: 'Select NES ROM',
+        allowMultiple: true,
+        dialogTitle: 'Select NES ROM(s)',
       );
-      if (result == null || result.files.single.path == null) return;
-      final path = result.files.single.path!;
-      if (!path.toLowerCase().endsWith('.nes')) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select a .nes file')),
-          );
-        }
-        return;
-      }
-      // Don't add duplicates
-      if (_roms.any((r) => r.path == path)) {
-        _launchGame(_roms.firstWhere((r) => r.path == path));
-        return;
-      }
-      final file = File(path);
-      final name = path.split('/').last.replaceAll('.nes', '');
-      final size = await file.length();
-      final entry = RomEntry(
-        name: name,
-        path: path,
-        sizeKB: size ~/ 1024,
-        color: RomEntry._colorForIndex(_roms.length),
-        icon: Icons.videogame_asset,
-      );
-      setState(() {
+      if (result == null || result.files.isEmpty) return;
+
+      int added = 0;
+      for (final pickedFile in result.files) {
+        final path = pickedFile.path;
+        if (path == null) continue;
+        if (!path.toLowerCase().endsWith('.nes')) continue;
+        // Don't add duplicates
+        if (_roms.any((r) => r.path == path)) continue;
+
+        final file = File(path);
+        if (!await file.exists()) continue;
+        final name = path.split('/').last.replaceAll('.nes', '');
+        final size = await file.length();
+        final entry = RomEntry(
+          name: name,
+          path: path,
+          sizeKB: size ~/ 1024,
+          color: RomEntry._colorForIndex(_roms.length),
+          icon: Icons.videogame_asset,
+        );
         _roms.add(entry);
-      });
-      _saveRoms();
+        added++;
+      }
+
+      if (added > 0) {
+        setState(() {});
+        _saveRoms();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No valid .nes files selected')),
+        );
+      }
     } catch (e) {
       debugPrint('NEZ: file picker error: $e');
     }

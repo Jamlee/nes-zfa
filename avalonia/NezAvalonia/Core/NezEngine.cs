@@ -54,7 +54,7 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     // GIF recording
     private volatile bool _recording;
     private readonly List<byte[]> _recordedFrames = new();
-    private const int MaxRecordFrames = 300; // ~5 seconds
+    private const int MaxRecordFrames = 150; // ~5 seconds (every other frame)
     private int _recordFrameCounter;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -202,6 +202,7 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
                 else buttons &= unchecked((byte)~(1 << NezBindings.ButtonB));
             }
             NezBindings.InputSetButtons(_console, buttons);
+            NezBindings.InputSetButtonsP2(_console, _buttonStateP2);
 
             // Run emulation
             NezBindings.Update(_console, 16);
@@ -303,6 +304,29 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
             _buttonState &= unchecked((byte)~(1 << button));
     }
 
+    // P2 button state
+    private volatile byte _buttonStateP2;
+
+    public void SetButtonP2(int button, bool pressed)
+    {
+        if (pressed)
+            _buttonStateP2 |= (byte)(1 << button);
+        else
+            _buttonStateP2 &= unchecked((byte)~(1 << button));
+    }
+
+    /// <summary>
+    /// Returns a snapshot of the current BGRA32 back buffer for MJPEG streaming.
+    /// </summary>
+    public byte[]? GetBackBuffer()
+    {
+        var buf = _backBuffer;
+        if (buf == null) return null;
+        var copy = new byte[buf.Length];
+        Buffer.BlockCopy(buf, 0, copy, 0, buf.Length);
+        return copy;
+    }
+
     public void SetTurboA(bool active) => _turboA = active;
     public void SetTurboB(bool active) => _turboB = active;
 
@@ -339,6 +363,7 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
             frames = new List<byte[]>(_recordedFrames);
             _recordedFrames.Clear();
         }
+        System.Diagnostics.Debug.WriteLine($"NEZ: StopRecording, {frames.Count} frames captured");
         if (frames.Count == 0) return null;
 
         int w = ScreenWidth, h = ScreenHeight;
@@ -362,17 +387,22 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
 
             gif.Metadata.GetGifMetadata().RepeatCount = 0;
 
-            var recordingsDir = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".nes-zfa", "recordings");
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (string.IsNullOrEmpty(home))
+                home = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (string.IsNullOrEmpty(home))
+                home = Path.GetTempPath();
+
+            var recordingsDir = Path.Combine(home, ".nes-zfa", "recordings");
             Directory.CreateDirectory(recordingsDir);
 
-            var path = System.IO.Path.Combine(recordingsDir, $"nez_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.gif");
+            var path = Path.Combine(recordingsDir, $"nez_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.gif");
             gif.SaveAsGif(path);
             return path;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"NEZ: GIF encode error: {ex}");
             return null;
         }
     }

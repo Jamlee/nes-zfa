@@ -121,6 +121,8 @@ class NezEmulator {
   late final _NezAudioQueueLenDart _audioQueueLen;
   late final _NezInputSetButtonsDart _inputSetButtons;
   late final _NezInputSetButtonDart _inputSetButton;
+  late final _NezInputSetButtonsDart _inputSetButtonsP2;
+  late final _NezInputSetButtonDart _inputSetButtonP2;
   late final _NezIsPausedDart _isPaused;
   late final _NezSetPauseDart _setPause;
   late final _NezCpuGetPcDart _cpuGetPc;
@@ -194,6 +196,12 @@ class NezEmulator {
     _inputSetButton =
         _lib.lookupFunction<_NezInputSetButtonC, _NezInputSetButtonDart>(
             'nez_input_set_button');
+    _inputSetButtonsP2 =
+        _lib.lookupFunction<_NezInputSetButtonsC, _NezInputSetButtonsDart>(
+            'nez_input_set_buttons_p2');
+    _inputSetButtonP2 =
+        _lib.lookupFunction<_NezInputSetButtonC, _NezInputSetButtonDart>(
+            'nez_input_set_button_p2');
     _isPaused =
         _lib.lookupFunction<_NezIsPausedC, _NezIsPausedDart>('nez_is_paused');
     _setPause =
@@ -255,6 +263,18 @@ class NezEmulator {
   void setButton(int buttonIndex, bool pressed) {
     if (!isRunning) return;
     _inputSetButton(_console, buttonIndex, pressed);
+  }
+
+  /// Set all 8 buttons at once for Player 2.
+  void setButtonsP2(int bitmask) {
+    if (!isRunning) return;
+    _inputSetButtonsP2(_console, bitmask);
+  }
+
+  /// Set a single button state for Player 2.
+  void setButtonP2(int buttonIndex, bool pressed) {
+    if (!isRunning) return;
+    _inputSetButtonP2(_console, buttonIndex, pressed);
   }
 
   bool get isPaused {

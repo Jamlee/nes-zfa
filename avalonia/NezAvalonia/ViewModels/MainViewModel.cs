@@ -38,7 +38,7 @@ public partial class MainViewModel : ObservableObject
 
     public void LaunchGame(string romPath, string romName)
     {
-        GameplayVm = new GameplayViewModel(romPath, romName);
+        GameplayVm = new GameplayViewModel(romPath, romName) { IsDesktop = IsDesktop };
         IsInGameplay = true;
     }
 

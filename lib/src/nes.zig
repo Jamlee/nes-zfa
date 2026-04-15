@@ -28,6 +28,7 @@ pub const Console = struct {
     apu: *APU,
     mainBus: *NESBus,
     controller: *Gamepad,
+    controller2: *Gamepad,
     is_paused: bool = false,
     audio_sample_queue: Queue(i16),
 
@@ -48,8 +49,11 @@ pub const Console = struct {
         const gamepad = try allocator.create(Gamepad);
         gamepad.* = Gamepad{};
 
+        const gamepad2 = try allocator.create(Gamepad);
+        gamepad2.* = Gamepad{};
+
         var mainBus = try allocator.create(NESBus);
-        mainBus.* = try NESBus.init(allocator, cart, apu, ppu, gamepad);
+        mainBus.* = try NESBus.init(allocator, cart, apu, ppu, gamepad, gamepad2);
 
         cpu.* = CPU.init(allocator, &mainBus.bus);
         apu.* = try APU.init(allocator, cpu);
@@ -63,6 +67,7 @@ pub const Console = struct {
             .apu = apu,
             .mainBus = mainBus,
             .controller = gamepad,
+            .controller2 = gamepad2,
             .audio_sample_queue = try Queue(i16).init(allocator),
         };
     }
@@ -78,6 +83,7 @@ pub const Console = struct {
         self.allocator.destroy(self.apu);
         self.allocator.destroy(self.mainBus);
         self.allocator.destroy(self.controller);
+        self.allocator.destroy(self.controller2);
         self.audio_sample_queue.deinit();
     }
 

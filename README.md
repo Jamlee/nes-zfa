@@ -2,11 +2,6 @@
 
 NES emulator with Zig core and multiple UI frontends.
 
-<div style="display: flex; gap: 10px;">
-    <img src="./lib/screens/megaman_gameplay.gif" alt="Megaman" width="256px"/>
-    <img src="./lib/screens/tetris.gif" alt="Tetris" width="256px"/>
-</div>
-
 ## Screenshots
 
 ![Jackal](docs/screens/jackal.gif)
@@ -77,12 +72,21 @@ Virtual joystick + A/B + Turbo A/B buttons. Landscape mode: joystick left, game 
 
 ## Features
 
-- GIF recording (toolbar button or ⌘R)
-- ROM library with persistence
-- Virtual gamepad with turbo buttons
-- Debug panel (CPU registers, PPU status)
-- Audio output (macOS)
-- Adaptive layout (portrait/landscape)
+- **Web Remote Gamepad** — scan QR code to use phone as wireless controller (P1/P2)
+  - Built-in HTTP server serves a touch gamepad page
+  - Joystick + A/B/TA/TB diamond layout (Nintendo style)
+  - MJPEG mirror mode: phone shows game display + controls
+  - Auto fullscreen + landscape lock
+  - Reset button
+- **2-Player Support** — P2 controller via web gamepad (NES $4017)
+- **GIF Recording** — capture gameplay to `~/.nes-zfa/recordings/`
+- **Recordings Manager** — browse, copy, open folder, delete GIFs
+- **ROM Library** — persistent library with bundled ROMs in APK
+- **Window Fit** — one-click remove black bars on macOS
+- **Audio** — macOS (AVAudioEngine) + Android (AudioTrack)
+- **Virtual Gamepad** — touch joystick + turbo buttons (mobile)
+- **Debug Panel** — CPU registers, PPU status (⌘D)
+- **Adaptive Layout** — portrait/landscape on mobile, responsive desktop
 
 ## Emulator Roadmap
 
@@ -111,8 +115,19 @@ Virtual joystick + A/B + Turbo A/B buttons. Landscape mode: joystick left, game 
 
 ## Credits
 
-Emulator core based on [nez](https://github.com/) — a Zig NES emulator by the original author.
-UI frontends and FFI bridge by this project.
+Emulator core based on [nez](https://github.com/) — a Zig NES emulator. Key improvements made in this fork:
+
+- **PPU sprite rendering fixes** — 3 critical bugs in sprite evaluation at cycle 257:
+  - Removed incorrect Y+1 offset in secondary OAM
+  - Fixed scanline reference (current vs next)
+  - Fixed 8x16 sprite pattern table selection (tile index `&= 0xFE`, bank from bit 0)
+- **Player 2 controller** — Added second gamepad ($4017 read), shared strobe
+- **FFI bridge** — Complete C ABI export layer (`lib/src/ffi.zig`) for Dart/Flutter and .NET/Avalonia integration
+- **Web remote gamepad** — Built-in HTTP/WebSocket server, HTML5 touch controller with MJPEG mirror
+- **Cross-platform audio** — macOS AVAudioEngine (Float32) + Android AudioTrack (PCM16)
+- **GIF recording** — Frame capture + encoding pipeline for both frontends
+
+UI frontends (Flutter + Avalonia) and all platform integrations by this project.
 
 ## License
 

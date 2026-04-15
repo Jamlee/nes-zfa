@@ -222,6 +222,7 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
         onCopyPath: () => _copyPath(_recordings[i]),
         onOpenFolder: () => _openFolder(_recordings[i]),
         onDelete: () => _deleteRecording(_recordings[i]),
+        onPreview: () => _previewGif(_recordings[i]),
       ),
     );
   }
@@ -247,57 +248,127 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
               ),
               child: const Icon(Icons.delete_outline, color: NezTheme.accentRed),
             ),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: NezTheme.bgCard,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: NezTheme.border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: NezTheme.accentPrimary.withValues(alpha: 0.15),
-                    ),
-                    child: const Icon(Icons.gif_box, color: NezTheme.accentPrimary, size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.filename,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: NezTheme.textPrimary,
+            child: GestureDetector(
+              onTap: () => _previewGif(entry),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: NezTheme.bgCard,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: NezTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    // GIF thumbnail
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 60,
+                        height: 56,
+                        child: Image.file(
+                          File(entry.path),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: NezTheme.bgSurface,
+                            child: const Icon(Icons.gif_box, color: NezTheme.accentPrimary, size: 22),
                           ),
                         ),
-                        Text(
-                          '${entry.dateText}  ${entry.sizeText}',
-                          style: const TextStyle(fontSize: 11, color: NezTheme.textDim),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 16, color: NezTheme.textSecondary),
-                    onPressed: () => _copyPath(entry),
-                    tooltip: 'Copy path',
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.filename,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: NezTheme.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '${entry.dateText}  ${entry.sizeText}',
+                            style: const TextStyle(fontSize: 11, color: NezTheme.textDim),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 16, color: NezTheme.textSecondary),
+                      onPressed: () => _copyPath(entry),
+                      tooltip: 'Copy path',
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  void _previewGif(RecordingEntry entry) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(ctx),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 512, maxHeight: 512),
+            decoration: BoxDecoration(
+              color: NezTheme.bgCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: NezTheme.border),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  child: Image.file(
+                    File(entry.path),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      height: 200,
+                      child: Center(child: Icon(Icons.broken_image, color: NezTheme.textDim, size: 48)),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${entry.filename}  •  ${entry.sizeText}',
+                          style: const TextStyle(fontSize: 11, color: NezTheme.textDim),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => _copyPath(entry),
+                        child: const Icon(Icons.copy, size: 16, color: NezTheme.textSecondary),
+                      ),
+                      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) ...[
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: () => _openFolder(entry),
+                          child: const Icon(Icons.folder_open, size: 16, color: NezTheme.textSecondary),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -308,19 +379,23 @@ class _RecordingCard extends StatelessWidget {
   final VoidCallback onCopyPath;
   final VoidCallback onOpenFolder;
   final VoidCallback onDelete;
+  final VoidCallback onPreview;
 
   const _RecordingCard({
     required this.entry,
     required this.onCopyPath,
     required this.onOpenFolder,
     required this.onDelete,
+    required this.onPreview,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
+    return GestureDetector(
+      onTap: onPreview,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Thumbnail area
@@ -373,6 +448,7 @@ class _RecordingCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

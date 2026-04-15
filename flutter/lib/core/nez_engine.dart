@@ -218,6 +218,14 @@ class NezEngine extends ChangeNotifier {
     }
   }
 
+  /// Set P2 button via FFI directly (used by remote gamepad server).
+  void setButtonP2(int button, bool pressed) {
+    _emu?.setButtonP2(button, pressed);
+  }
+
+  /// Get the last RGBA frame data (for MJPEG streaming).
+  Uint8List? get lastRgbaFrame => _lastRgba;
+
   void setTurboA(bool active) => _turboA = active;
   void setTurboB(bool active) => _turboB = active;
 

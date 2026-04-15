@@ -267,11 +267,22 @@ class _JoystickPainter extends CustomPainter {
       old.thumbOffset != thumbOffset || old.isDragging != isDragging;
 }
 
-/// A/B and Turbo A/B buttons in 2x2 grid.
+/// A/B and Turbo A/B buttons in diamond layout matching Nintendo controller.
+///
+/// Layout:
+///       TA (top)
+///   TB (left)   A (right)
+///       B (bottom)
 class _ActionButtons extends StatelessWidget {
   final ButtonCallback onButton;
   final TurboCallback onTurboA;
   final TurboCallback onTurboB;
+
+  // Button size and spacing.
+  static const double _btnSize = 56;
+  static const double _offset = 52;
+  // Total area: button + 2 * offset on each axis.
+  static const double _areaSize = _btnSize + _offset * 2;
 
   const _ActionButtons({
     required this.onButton,
@@ -281,45 +292,53 @@ class _ActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const center = _areaSize / 2;
+    const half = _btnSize / 2;
+
     return SizedBox(
-      width: 140,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      width: _areaSize,
+      height: _areaSize,
+      child: Stack(
         children: [
-          // Turbo row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _TurboButton(
-                label: 'B',
-                color: NezTheme.accentRed,
-                onChanged: (p) => onTurboB(p),
-              ),
-              const SizedBox(width: 14),
-              _TurboButton(
-                label: 'A',
-                color: NezTheme.accentPrimary,
-                onChanged: (p) => onTurboA(p),
-              ),
-            ],
+          // TA – top
+          Positioned(
+            left: center - half,
+            top: center - _offset - half,
+            child: _TurboButton(
+              label: 'TA',
+              color: const Color(0xFFFF8A80),
+              onChanged: (p) => onTurboA(p),
+            ),
           ),
-          const SizedBox(height: 10),
-          // Main A/B row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ActionButton(
-                label: 'B',
-                color: NezTheme.accentRed,
-                onPressed: (p) => onButton(NesButton.b, p),
-              ),
-              const SizedBox(width: 14),
-              _ActionButton(
-                label: 'A',
-                color: NezTheme.accentPrimary,
-                onPressed: (p) => onButton(NesButton.a, p),
-              ),
-            ],
+          // B – bottom
+          Positioned(
+            left: center - half,
+            top: center + _offset - half,
+            child: _ActionButton(
+              label: 'B',
+              color: const Color(0xFFFFA726),
+              onPressed: (p) => onButton(NesButton.b, p),
+            ),
+          ),
+          // TB – left
+          Positioned(
+            left: center - _offset - half,
+            top: center - half,
+            child: _TurboButton(
+              label: 'TB',
+              color: const Color(0xFFFFCC80),
+              onChanged: (p) => onTurboB(p),
+            ),
+          ),
+          // A – right
+          Positioned(
+            left: center + _offset - half,
+            top: center - half,
+            child: _ActionButton(
+              label: 'A',
+              color: const Color(0xFFEF5350),
+              onPressed: (p) => onButton(NesButton.a, p),
+            ),
           ),
         ],
       ),
@@ -405,40 +424,28 @@ class _TurboButtonState extends State<_TurboButton> {
         widget.onChanged(false);
       },
       child: Container(
-        width: 44,
-        height: 44,
+        width: 56,
+        height: 56,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: _active ? widget.color.withOpacity(0.2) : Colors.transparent,
+          color: _active ? widget.color.withOpacity(0.3) : widget.color.withOpacity(0.15),
           border: Border.all(color: widget.color, width: 2),
           boxShadow: [
             BoxShadow(
-              color: widget.color.withOpacity(0.15),
+              color: widget.color.withOpacity(0.2),
               blurRadius: 8,
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'TURBO',
-              style: TextStyle(
-                color: widget.color,
-                fontSize: 6,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
+        child: Center(
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: widget.color,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
-            Text(
-              widget.label,
-              style: TextStyle(
-                color: widget.color,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -15,9 +15,15 @@ namespace NezAvalonia.ViewModels;
 
 public partial class RecordingsViewModel : ObservableObject
 {
-    private static readonly string RecordingsDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".nes-zfa", "recordings");
+    private static string GetRecordingsDir()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (string.IsNullOrEmpty(home))
+            home = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrEmpty(home))
+            home = Path.GetTempPath();
+        return Path.Combine(home, ".nes-zfa", "recordings");
+    }
 
     public ObservableCollection<RecordingEntry> Recordings { get; } = new();
 
@@ -30,9 +36,10 @@ public partial class RecordingsViewModel : ObservableObject
     public void LoadRecordings()
     {
         Recordings.Clear();
-        if (!Directory.Exists(RecordingsDir)) return;
+        var dir = GetRecordingsDir();
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
 
-        var files = Directory.GetFiles(RecordingsDir, "*.gif")
+        var files = Directory.GetFiles(dir, "*.gif")
             .Select(p => new FileInfo(p))
             .OrderByDescending(f => f.LastWriteTime);
 
@@ -65,7 +72,7 @@ public partial class RecordingsViewModel : ObservableObject
     [RelayCommand]
     private void OpenFolder(RecordingEntry entry)
     {
-        var dir = Path.GetDirectoryName(entry.FilePath) ?? RecordingsDir;
+        var dir = Path.GetDirectoryName(entry.FilePath) ?? GetRecordingsDir();
         try
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))

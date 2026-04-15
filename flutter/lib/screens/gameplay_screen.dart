@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
+import '../core/gamepad_server.dart';
 import '../core/nez_bindings.dart';
 import '../core/nez_engine.dart';
 import '../core/theme.dart';
@@ -28,7 +30,9 @@ class GameplayScreen extends StatefulWidget {
 class _GameplayScreenState extends State<GameplayScreen>
     with SingleTickerProviderStateMixin {
   late final NezEngine _engine;
+  late final GamepadServer _gamepadServer;
   bool _showDebug = false;
+  bool _showControllers = false;
   bool _loading = true;
   String? _error;
 
@@ -39,6 +43,7 @@ class _GameplayScreenState extends State<GameplayScreen>
   void initState() {
     super.initState();
     _engine = NezEngine();
+    _gamepadServer = GamepadServer(_engine);
     _engine.onFrameReady = () {
       if (mounted) setState(() {});
     };
@@ -56,6 +61,7 @@ class _GameplayScreenState extends State<GameplayScreen>
         return;
       }
       _engine.startLoop(this);
+      _gamepadServer.start(); // Auto-start web gamepad server
       setState(() => _loading = false);
     } catch (e) {
       setState(() {
@@ -67,6 +73,7 @@ class _GameplayScreenState extends State<GameplayScreen>
 
   @override
   void dispose() {
+    _gamepadServer.stop();
     _engine.dispose();
     super.dispose();
   }
@@ -161,7 +168,7 @@ class _GameplayScreenState extends State<GameplayScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width > 800;
+    final isDesktop = Platform.isMacOS || Platform.isLinux || Platform.isWindows || MediaQuery.of(context).size.width > 800;
 
     return Focus(
       autofocus: true,
@@ -202,52 +209,120 @@ class _GameplayScreenState extends State<GameplayScreen>
   // ---- Desktop Layout ----
 
   Widget _buildDesktopLayout() {
-    return Column(
+    return Stack(
       children: [
-        // Toolbar
-        _DesktopToolbar(
-          romName: widget.romName,
-          isPaused: _engine.isPaused,
-          isRecording: _engine.isRecording,
-          showDebug: _showDebug,
-          onBack: () => Navigator.pop(context),
-          onPause: () {
-            _engine.togglePause();
-            setState(() {});
-          },
-          onToggleDebug: () => setState(() => _showDebug = !_showDebug),
-          onRecord: _toggleRecording,
-          onFit: _fitWindow,
-        ),
-        // Main content
-        Expanded(
-          child: Row(
-            children: [
-              // Viewport — fill available space, maintain NES aspect ratio
-              Expanded(
-                child: Container(
-                  color: Colors.black,
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: SizedBox(
-                      width: 256,
-                      height: 240,
-                      child: NesDisplay(
-                        frame: _engine.currentFrame,
-                        fps: _engine.fps,
+        Column(
+          children: [
+            // Toolbar
+            _DesktopToolbar(
+              romName: widget.romName,
+              isPaused: _engine.isPaused,
+              isRecording: _engine.isRecording,
+              showDebug: _showDebug,
+              onBack: () => Navigator.pop(context),
+              onPause: () {
+                _engine.togglePause();
+                setState(() {});
+              },
+              onToggleDebug: () => setState(() => _showDebug = !_showDebug),
+              onRecord: _toggleRecording,
+              onFit: _fitWindow,
+              onControllers: _toggleControllers,
+              showControllers: _showControllers,
+            ),
+            // Main content
+            Expanded(
+              child: Row(
+                children: [
+                  // Viewport — fill available space, maintain NES aspect ratio
+                  Expanded(
+                    child: Container(
+                      color: Colors.black,
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: SizedBox(
+                          width: 256,
+                          height: 240,
+                          child: NesDisplay(
+                            frame: _engine.currentFrame,
+                            fps: _engine.fps,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  // Debug panel
+                  if (_showDebug) _DebugPanel(engine: _engine),
+                ],
               ),
-              // Debug panel
-              if (_showDebug) _DebugPanel(engine: _engine),
-            ],
-          ),
-        ),
+            ),
         // Keybindings bar
         const KeybindingsBar(),
       ],
+    ),
+    // QR overlay
+    if (_showControllers) _buildQrOverlay(),
+    ],
+    );
+  }
+
+  void _toggleControllers() async {
+    if (!_gamepadServer.isRunning) {
+      await _gamepadServer.start();
+    }
+    setState(() => _showControllers = !_showControllers);
+  }
+
+  Widget _buildQrOverlay() {
+    final isDesktop = Platform.isMacOS || Platform.isLinux || Platform.isWindows;
+    final p1Url = isDesktop ? _gamepadServer.p1Url : _gamepadServer.p1MirrorUrl;
+    final p2Url = isDesktop ? _gamepadServer.p2Url : _gamepadServer.p2MirrorUrl;
+
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: () => setState(() => _showControllers = false),
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.85),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: NezTheme.border),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Scan to Connect Controller',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _gamepadServer.localIp ?? '',
+                    style: const TextStyle(fontSize: 11, color: NezTheme.textDim),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _QrCard(label: 'Player 1', url: p1Url, color: NezTheme.accentPrimary),
+                      const SizedBox(width: 24),
+                      _QrCard(label: 'Player 2', url: p2Url, color: NezTheme.accentSecondary),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    isDesktop ? 'Gamepad only' : 'Gamepad + mirrored display',
+                    style: const TextStyle(fontSize: 10, color: NezTheme.textDim),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -264,18 +339,59 @@ class _GameplayScreenState extends State<GameplayScreen>
   }
 
   Widget _buildMobilePortrait() {
-    return Column(
+    return Stack(
       children: [
-        // Top bar
-        _MobileTopBar(
-          romName: widget.romName,
-          isPaused: _engine.isPaused,
-          onBack: () => Navigator.pop(context),
-          onPause: () => _engine.togglePause(),
+        Column(
+          children: [
+            // Top bar
+            _MobileTopBar(
+              romName: widget.romName,
+              isPaused: _engine.isPaused,
+              isRecording: _engine.isRecording,
+              onBack: () => Navigator.pop(context),
+              onPause: () => _engine.togglePause(),
+              onControllers: _toggleControllers,
+              onRecord: _toggleRecording,
+            ),
+            // NES viewport — fill width, maintain ratio
+            Expanded(
+              flex: 3,
+              child: Container(
+                color: Colors.black,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: 256,
+                    height: 240,
+                    child: NesDisplay(
+                      frame: _engine.currentFrame,
+                      fps: _engine.fps,
+                    ),
+                  ),
+            ),
+          ),
         ),
-        // NES viewport — fill width, maintain ratio
-        Expanded(
-          flex: 3,
+        // Virtual gamepad
+        Flexible(
+          flex: 2,
+          child: VirtualGamepad(
+            onButton: _engine.setButton,
+            onTurboA: _engine.setTurboA,
+            onTurboB: _engine.setTurboB,
+          ),
+        ),
+      ],
+    ),
+    if (_showControllers) _buildQrOverlay(),
+    ],
+    );
+  }
+
+  Widget _buildMobileLandscape() {
+    return Stack(
+      children: [
+        // Game viewport — fullscreen behind everything
+        Positioned.fill(
           child: Container(
             color: Colors.black,
             child: FittedBox(
@@ -291,96 +407,84 @@ class _GameplayScreenState extends State<GameplayScreen>
             ),
           ),
         ),
-        // Virtual gamepad
-        Flexible(
-          flex: 2,
-          child: VirtualGamepad(
-            onButton: _engine.setButton,
-            onTurboA: _engine.setTurboA,
-            onTurboB: _engine.setTurboB,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMobileLandscape() {
-    return Row(
-      children: [
-        // Left: D-pad / joystick area
-        Expanded(
-          flex: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: VirtualGamepad.joystickOnly(
-              onButton: _engine.setButton,
-            ),
-          ),
-        ),
-        // Center: Game viewport
-        Expanded(
-          flex: 3,
-          child: Column(
+        // Transparent controls overlay
+        Positioned.fill(
+          child: Row(
             children: [
-              // Mini top bar
-              SizedBox(
-                height: 32,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Text('← Back', style: TextStyle(color: NezTheme.accentSecondary, fontSize: 12)),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(widget.romName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-              // Viewport
+              // Left: D-pad / joystick
               Expanded(
-                child: Container(
-                  color: Colors.black,
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: SizedBox(
-                      width: 256,
-                      height: 240,
-                      child: NesDisplay(
-                        frame: _engine.currentFrame,
-                        fps: _engine.fps,
-                      ),
-                    ),
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: VirtualGamepad.joystickOnly(
+                    onButton: _engine.setButton,
                   ),
                 ),
               ),
-              // SELECT / START
-              SizedBox(
-                height: 28,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              // Center spacer with mini top bar + system buttons
+              Expanded(
+                flex: 3,
+                child: Column(
                   children: [
-                    _MiniSysBtn(label: 'SEL', onPressed: (p) => _engine.setButton(NesButton.select, p)),
-                    const SizedBox(width: 16),
-                    _MiniSysBtn(label: 'START', onPressed: (p) => _engine.setButton(NesButton.start, p)),
+                    // Mini top bar
+                    SizedBox(
+                      height: 32,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: const Text('← Back', style: TextStyle(color: NezTheme.accentSecondary, fontSize: 12, shadows: [Shadow(blurRadius: 4)])),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(widget.romName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, shadows: [Shadow(blurRadius: 4)])),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: _toggleControllers,
+                            child: Icon(Icons.qr_code, size: 18, color: _showControllers ? NezTheme.accentPrimary : NezTheme.textSecondary),
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: _toggleRecording,
+                            child: Icon(Icons.fiber_manual_record, size: 18, color: _engine.isRecording ? NezTheme.accentRed : NezTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    // SELECT / START at bottom center
+                    SizedBox(
+                      height: 28,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _MiniSysBtn(label: 'SEL', onPressed: (p) => _engine.setButton(NesButton.select, p)),
+                          const SizedBox(width: 16),
+                          _MiniSysBtn(label: 'START', onPressed: (p) => _engine.setButton(NesButton.start, p)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                   ],
+                ),
+              ),
+              // Right: Action buttons
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: VirtualGamepad.buttonsOnly(
+                    onButton: _engine.setButton,
+                    onTurboA: _engine.setTurboA,
+                    onTurboB: _engine.setTurboB,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        // Right: Action buttons
-        Expanded(
-          flex: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: VirtualGamepad.buttonsOnly(
-              onButton: _engine.setButton,
-              onTurboA: _engine.setTurboA,
-              onTurboB: _engine.setTurboB,
-            ),
-          ),
-        ),
+        // QR overlay (if showing)
+        if (_showControllers) _buildQrOverlay(),
       ],
     );
   }
@@ -392,22 +496,26 @@ class _DesktopToolbar extends StatelessWidget {
   final bool isPaused;
   final bool isRecording;
   final bool showDebug;
+  final bool showControllers;
   final VoidCallback onBack;
   final VoidCallback onPause;
   final VoidCallback onToggleDebug;
   final VoidCallback onRecord;
   final VoidCallback onFit;
+  final VoidCallback onControllers;
 
   const _DesktopToolbar({
     required this.romName,
     required this.isPaused,
     required this.isRecording,
     required this.showDebug,
+    required this.showControllers,
     required this.onBack,
     required this.onPause,
     required this.onToggleDebug,
     required this.onRecord,
     required this.onFit,
+    required this.onControllers,
   });
 
   @override
@@ -440,6 +548,8 @@ class _DesktopToolbar extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           _ToolbarBtn(icon: Icons.fit_screen, label: 'Fit', onTap: onFit),
+          const SizedBox(width: 6),
+          _ToolbarBtn(icon: Icons.qr_code, label: 'Controllers', onTap: onControllers, highlighted: showControllers),
           const SizedBox(width: 6),
           _ToolbarBtn(icon: Icons.bug_report, label: 'Debug', kbd: '⌘D', onTap: onToggleDebug, highlighted: showDebug),
         ],
@@ -580,14 +690,20 @@ class _DebugPanel extends StatelessWidget {
 class _MobileTopBar extends StatelessWidget {
   final String romName;
   final bool isPaused;
+  final bool isRecording;
   final VoidCallback onBack;
   final VoidCallback onPause;
+  final VoidCallback? onControllers;
+  final VoidCallback? onRecord;
 
   const _MobileTopBar({
     required this.romName,
     required this.isPaused,
+    this.isRecording = false,
     required this.onBack,
     required this.onPause,
+    this.onControllers,
+    this.onRecord,
   });
 
   @override
@@ -604,6 +720,24 @@ class _MobileTopBar extends StatelessWidget {
           const Spacer(),
           Text(romName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           const Spacer(),
+          if (onRecord != null) ...[
+            GestureDetector(
+              onTap: onRecord,
+              child: Icon(
+                Icons.fiber_manual_record,
+                color: isRecording ? NezTheme.accentRed : NezTheme.textSecondary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          if (onControllers != null) ...[
+            GestureDetector(
+              onTap: onControllers,
+              child: const Icon(Icons.qr_code, color: NezTheme.textSecondary, size: 18),
+            ),
+            const SizedBox(width: 12),
+          ],
           GestureDetector(
             onTap: onPause,
             child: Icon(isPaused ? Icons.play_arrow : Icons.pause, color: NezTheme.textSecondary, size: 20),
@@ -635,6 +769,43 @@ class _MiniSysBtn extends StatelessWidget {
         ),
         child: Text(label, style: const TextStyle(color: NezTheme.textDim, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 1)),
       ),
+    );
+  }
+}
+
+class _QrCard extends StatelessWidget {
+  final String label;
+  final String url;
+  final Color color;
+
+  const _QrCard({required this.label, required this.url, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: QrImageView(
+            data: url,
+            version: QrVersions.auto,
+            size: 160,
+            backgroundColor: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        SelectableText(
+          url,
+          style: const TextStyle(fontSize: 9, color: NezTheme.textDim, fontFamily: 'monospace'),
+        ),
+      ],
     );
   }
 }
