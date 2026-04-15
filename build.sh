@@ -66,11 +66,18 @@ build_android_so() {
     info "Cross-compiling for Android arm64..."
     cd "$LIB_DIR"
     local ndk=""
-    [ -n "$ANDROID_NDK_HOME" ] && ndk="$ANDROID_NDK_HOME" || \
-        for d in ~/Library/Android/sdk/ndk/*/; do ndk="${d%/}"; done
-    [ -z "$ndk" ] && fail "Android NDK not found"
+    if [ -n "$ANDROID_NDK_HOME" ]; then
+        ndk="$ANDROID_NDK_HOME"
+    else
+        # Pick NDK with a working darwin sysroot
+        for d in ~/Library/Android/sdk/ndk/*/; do
+            if [ -d "${d}toolchains/llvm/prebuilt/darwin-x86_64/sysroot" ]; then
+                ndk="${d%/}"
+            fi
+        done
+    fi
+    [ -z "$ndk" ] && fail "Android NDK not found (need darwin-x86_64 sysroot)"
     local sysroot="$ndk/toolchains/llvm/prebuilt/darwin-x86_64/sysroot"
-    [ -d "$sysroot" ] || sysroot="$ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 
     cat > /tmp/nez-android-libc.conf <<LIBC
 include_dir=$sysroot/usr/include
