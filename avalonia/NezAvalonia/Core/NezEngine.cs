@@ -21,7 +21,7 @@ namespace NezAvalonia.Core;
 /// Uses a dedicated high-precision thread for emulation + audio (not DispatcherTimer).
 /// UI thread only reads the framebuffer for rendering.
 /// </summary>
-public sealed class NezEngine : INotifyPropertyChanged, IDisposable
+public sealed class NezEngine : INezEngine
 {
     private IntPtr _console;
     private WriteableBitmap? _frameBitmap;
@@ -54,8 +54,9 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     // GIF recording
     private volatile bool _recording;
     private readonly List<byte[]> _recordedFrames = new();
-    private const int MaxRecordFrames = 150; // ~5 seconds (every other frame)
+    private const int MaxRecordFrames = 300; // ~5 seconds at 60fps (every other frame)
     private int _recordFrameCounter;
+    private string _recordingRomName = string.Empty;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action? FrameReady;
@@ -123,6 +124,9 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
         // Start audio
         _audioPlayer = NezAudioFactory.Create();
         _audioPlayer.Start();
+        _audioPlayer.SetVolume(_volume);
+        if (!_soundEnabled)
+            _audioPlayer.Stop();
         _audioBuffer = Marshal.AllocHGlobal(AudioBufferSize * 2);
 
         // Start dedicated emulation thread
@@ -140,7 +144,7 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     public void StopLoop()
     {
         _isRunning = false;
-        _emuThread?.Join(500);
+        _emuThread?.Join(2000); // Increased from 500ms to give emu thread time to exit cleanly
         _emuThread = null;
 
         _audioPlayer?.Stop();
@@ -231,22 +235,32 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
 
     /// <summary>
     /// Called on UI thread: copy back buffer into WriteableBitmap and notify view.
+    /// Wrapped in try/catch to prevent unhandled exceptions crashing the Dispatcher loop
+    /// (e.g. during Dispose race where _frameBitmap is already disposed).
     /// </summary>
     private void FlushFrame()
     {
-        if (!_frameReady || _frameBitmap == null || _backBuffer == null) return;
-        _frameReady = false;
-
-        unsafe
+        try
         {
-            using var locked = _frameBitmap.Lock();
-            fixed (byte* src = _backBuffer)
-            {
-                Buffer.MemoryCopy(src, (void*)locked.Address, _backBuffer.Length, _backBuffer.Length);
-            }
-        }
+            if (!_frameReady || _frameBitmap == null || _backBuffer == null) return;
+            _frameReady = false;
 
-        FrameReady?.Invoke();
+            unsafe
+            {
+                using var locked = _frameBitmap.Lock();
+                if (locked.Address == IntPtr.Zero) return;
+                fixed (byte* src = _backBuffer)
+                {
+                    Buffer.MemoryCopy(src, (void*)locked.Address, _backBuffer.Length, _backBuffer.Length);
+                }
+            }
+
+            FrameReady?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"NEZ FlushFrame suppressed: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -290,10 +304,32 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
 
     private void DrainAudio()
     {
-        if (_audioPlayer == null || _console == IntPtr.Zero || _audioBuffer == IntPtr.Zero) return;
+        if (!_soundEnabled || _audioPlayer == null || _console == IntPtr.Zero || _audioBuffer == IntPtr.Zero) return;
         uint count = NezBindings.AudioQueueDrain(_console, _audioBuffer, AudioBufferSize);
         if (count > 0)
             _audioPlayer.PushSamples(_audioBuffer, (int)count);
+    }
+
+    // Audio control (driven by settings)
+    private volatile bool _soundEnabled = true;
+    private double _volume = 0.8;
+
+    public void SetSoundEnabled(bool enabled)
+    {
+        _soundEnabled = enabled;
+        if (_audioPlayer != null)
+        {
+            if (!enabled)
+                _audioPlayer.Stop();
+            else if (_isRunning)
+                _audioPlayer.Start();
+        }
+    }
+
+    public void SetVolume(double volume)
+    {
+        _volume = volume;
+        _audioPlayer?.SetVolume(volume);
     }
 
     public void SetButton(int button, bool pressed)
@@ -316,7 +352,7 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// Returns a snapshot of the current BGRA32 back buffer for MJPEG streaming.
+    /// Returns a snapshot of the current BGRA32 back buffer for delta streaming.
     /// </summary>
     public byte[]? GetBackBuffer()
     {
@@ -344,12 +380,22 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
 
     // ---- GIF Recording ----
 
-    public void StartRecording()
+    public void StartRecording(string romName)
     {
         lock (_recordedFrames) { _recordedFrames.Clear(); }
         _recordFrameCounter = 0;
+        _recordingRomName = SanitizeFileName(romName);
         _recording = true;
         OnPropertyChanged(nameof(IsRecording));
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        // Remove extension and sanitize for file name
+        var n = Path.GetFileNameWithoutExtension(name) ?? name;
+        foreach (var c in Path.GetInvalidFileNameChars())
+            n = n.Replace(c, '_');
+        return n.Trim('_').Trim();
     }
 
     public async Task<string?> StopRecording()
@@ -367,10 +413,11 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
         if (frames.Count == 0) return null;
 
         int w = ScreenWidth, h = ScreenHeight;
-        return await Task.Run(() => EncodeGif(w, h, frames));
+        string romName = _recordingRomName;
+        return await Task.Run(() => EncodeGif(w, h, frames, romName));
     }
 
-    private static string? EncodeGif(int w, int h, List<byte[]> frames)
+    private static string? EncodeGif(int w, int h, List<byte[]> frames, string romName)
     {
         try
         {
@@ -396,7 +443,8 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
             var recordingsDir = Path.Combine(home, ".nes-zfa", "recordings");
             Directory.CreateDirectory(recordingsDir);
 
-            var path = Path.Combine(recordingsDir, $"nez_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.gif");
+            var namePart = string.IsNullOrEmpty(romName) ? "" : $"{romName}_";
+            var path = Path.Combine(recordingsDir, $"nez_{namePart}{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.gif");
             gif.SaveAsGif(path);
             return path;
         }
@@ -410,13 +458,15 @@ public sealed class NezEngine : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         StopLoop();
+        _isLoaded = false; // Signal FlushFrame / EmulationLoop to stop working
+
         if (_console != IntPtr.Zero)
         {
             NezBindings.Destroy(_console);
             _console = IntPtr.Zero;
         }
         _frameBitmap?.Dispose();
-        _frameBitmap = null;
+        _frameBitmap = null;  // Null out so FlushFrame's null-check catches it
         _backBuffer = null;
     }
 }

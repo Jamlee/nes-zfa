@@ -1,5 +1,7 @@
 const std = @import("std");
-const Mapper = @import("./mapper.zig").Mapper;
+const mapper_mod = @import("./mapper.zig");
+const Mapper = mapper_mod.Mapper;
+const noopStep = mapper_mod.noopStep;
 const Cart = @import("../cart.zig").Cart;
 const CPU = @import("../cpu.zig").CPU;
 const PPU = @import("../ppu/ppu.zig").PPU;
@@ -88,7 +90,7 @@ pub const NROM = struct {
         return .{
             .cart = cart,
             .ppu = ppu,
-            .mapper = Mapper.init(nromRead, nromWrite, ppuRead, ppuWrite),
+            .mapper = Mapper.init(nromRead, nromWrite, ppuRead, ppuWrite, noopStep),
             // If the cart has CHR RAM, use it. Otherwise, use CHR ROM.
             .chr = if (cart.has_chr_ram) cart.chr_ram else cart.chr_rom,
         };

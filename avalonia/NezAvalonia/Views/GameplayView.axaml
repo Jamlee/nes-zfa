@@ -61,6 +61,16 @@
                                 <ctrl:KeyBadge Label="Space"/>
                             </StackPanel>
                         </Button>
+                        <Button Click="OnToggleRecord" Classes="toolbar" Name="RecordBtn">
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <Panel Width="12" Height="12">
+                                    <Ellipse Width="12" Height="12" Fill="#FF4444" IsVisible="{Binding IsRecording}"/>
+                                    <Ellipse Width="12" Height="12" Fill="#884444" IsVisible="{Binding !IsRecording}"/>
+                                </Panel>
+                                <TextBlock Text="{Binding IsRecording, Converter={x:Static vm:StringConverters.RecordLabel}}" FontSize="12"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                         <Button Click="OnFitWindow" Classes="toolbar">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                 <PathIcon Data="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"

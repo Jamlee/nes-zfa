@@ -100,6 +100,12 @@ public sealed class NezAudioPlayerMacOS : INezAudioPlayer
         _audioQueue = IntPtr.Zero;
     }
 
+    public void SetVolume(double volume)
+    {
+        if (_audioQueue != IntPtr.Zero)
+            AudioQueueSetParameter(_audioQueue, 1 /* kAudioQueueParam_Volume */, (float)volume);
+    }
+
     /// <summary>
     /// Push Int16 PCM samples from emulator, converting to Float32 for the ring buffer.
     /// Called from game loop (UI thread) — single producer.
@@ -121,6 +127,10 @@ public sealed class NezAudioPlayerMacOS : INezAudioPlayer
 
     private void OnCallback(IntPtr userData, IntPtr audioQueue, IntPtr bufferPtr)
     {
+        // Guard against callbacks firing after Stop()/Dispose() has already cleaned up.
+        // AudioQueueStop(immediate:true) should drain pending buffers, but race conditions
+        // can still deliver one final callback on the audio thread.
+        if (_disposed || !_isRunning) return;
         unsafe
         {
             AudioQueueBuffer* buf = (AudioQueueBuffer*)bufferPtr;

@@ -4,6 +4,11 @@ pub const MapperKind = enum {
     nrom,
     mmc1,
     UxROM,
+    cnrom,
+    mmc3,
+    axrom,
+    mapper40,
+    mapper225,
 };
 
 pub const MirrorMode = enum {
@@ -22,6 +27,7 @@ pub const Mapper = struct {
     pub const PPUReadFn = *const fn (*Mapper, u16) u8;
     pub const WriteFn = *const fn (*Mapper, u16, u8) void;
     pub const PPUWriteFn = *const fn (*Mapper, u16, u8) void;
+    pub const StepFn = *const fn (*Mapper) void;
 
     ppu_mirror_mode: MirrorMode = .horizontal,
     /// A pointer to the read-function implemented by
@@ -38,25 +44,25 @@ pub const Mapper = struct {
 
     /// A pointer to the PPU write-function implemented by
     /// the concrete mapper type.
-    ppuWriteFn: WriteFn,
+    ppuWriteFn: PPUWriteFn,
+
+    /// Called once per CPU cycle. Used for IRQ timing (e.g., MMC3 scanline counter).
+    stepFn: StepFn,
 
     /// Initialize a mapper.
-    /// `impl`: a mapper implementation.
-    /// `read`: a function that reads from the mapper.
-    /// `write`: a function that writes to the mapper.
-    /// `resolveAddrFn`: a function that can resolve an address to a byte ptr.
-    /// `deinitFn`: a function that deinitializes the mapper.
     pub fn init(
         readFn: ReadFn,
         writeFn: WriteFn,
         ppuReadFn: PPUReadFn,
         ppuWriteFn: PPUWriteFn,
+        stepFn: StepFn,
     ) Self {
         return .{
             .readFn = readFn,
             .writeFn = writeFn,
             .ppuReadFn = ppuReadFn,
             .ppuWriteFn = ppuWriteFn,
+            .stepFn = stepFn,
         };
     }
 
@@ -93,4 +99,12 @@ pub const Mapper = struct {
     pub fn ppuWrite(self: *Self, addr: u16, value: u8) void {
         self.ppuWriteFn(self, addr, value);
     }
+
+    /// Step the mapper's internal state (IRQ counters etc). Called once per CPU cycle.
+    pub fn step(self: *Self) void {
+        self.stepFn(self);
+    }
 };
+
+/// No-op step function for mappers that don't need per-cycle processing.
+pub fn noopStep(_: *Mapper) void {}

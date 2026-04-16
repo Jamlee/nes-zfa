@@ -6,6 +6,16 @@ NES emulator with Zig core and multiple UI frontends.
 
 ![Jackal](docs/screens/jackal.gif)
 
+## Output Files
+
+| File | Platform | UI |
+|------|----------|-----|
+| `nez-macos-flutter.dmg` | macOS | Flutter |
+| `nez-macos-avalonia.dmg` | macOS | Avalonia |
+| `nez-android-flutter.apk` | Android | Flutter |
+| `nez-android-avalonia.apk` | Android | Avalonia |
+| `nez-windows-avalonia.zip` | Windows | Avalonia |
+
 ```
 ├── lib/          Zig emulator core (CPU, PPU, APU, mappers)
 ├── flutter/      Flutter UI (macOS, Android)

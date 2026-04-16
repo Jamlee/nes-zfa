@@ -186,19 +186,126 @@ body.mirror-mode #btn-tb{background:radial-gradient(circle at 40% 35%,rgba(224,1
     ws.onclose=function(){
       st.textContent='Reconnecting...';
       st.className='status err';
+      frameBuf=null; // Reset buffer on reconnect
       setTimeout(connect,1500);
     };
 
     ws.onerror=function(){try{ws.close();}catch(e){}};
 
-    ws.onmessage=function(e){
-      // Binary = JPEG frame for mirror
-      if(e.data instanceof ArrayBuffer){
-        if(!mirror)return;
-        var blob=new Blob([e.data],{type:'image/jpeg'});
+    // ---- Delta protocol decoder ----
+    var W=256,H=240,BPP=4; // BGRA32
+    var frameBuf=null; // Uint8Array(W*H*4) — client-side frame buffer
+    var frameNum=0;
+    var canvas=null,ctx2d=null;
+    var imgData=null;
+
+    // Ensure canvas for mirror rendering
+    if(mirror){
+      canvas=document.createElement('canvas');
+      canvas.width=W;canvas.height=H;
+      ctx2d=canvas.getContext('2d');
+      imgData=ctx2d.createImageData(W,H);
+      streamImg.style.imageRendering='pixelated';
+    }
+
+    // Apply frame buffer to canvas → blob → img
+    function flushFrame(pxFormat){
+      if(!frameBuf||!ctx2d)return;
+      var d=imgData.data;
+      for(var i=0;i<W*H;i++){
+        var si=i*4,di=i*4;
+        if(pxFormat===0x00){
+          // BGRA → RGBA
+          d[di]=frameBuf[si+2];   // R
+          d[di+1]=frameBuf[si+1]; // G
+          d[di+2]=frameBuf[si];   // B
+        }else{
+          // RGBA → RGBA (direct copy)
+          d[di]=frameBuf[si];
+          d[di+1]=frameBuf[si+1];
+          d[di+2]=frameBuf[si+2];
+        }
+        d[di+3]=255;
+      }
+      ctx2d.putImageData(imgData,0,0);
+      canvas.toBlob(function(blob){
+        if(!blob)return;
         if(blobUrl)URL.revokeObjectURL(blobUrl);
         blobUrl=URL.createObjectURL(blob);
         streamImg.src=blobUrl;
+      },'image/png');
+    }
+
+    // Decode full frame (type 0x00)
+    function decodeFullFrame(data,offset,fnum,pxFormat){
+      var len=W*H*BPP;
+      if(offset+len>data.byteLength)return;
+      if(!frameBuf)frameBuf=new Uint8Array(W*H*BPP);
+      frameBuf.set(new Uint8Array(data,offset,len));
+      frameNum=fnum;
+      flushFrame(pxFormat);
+    }
+
+    // Decode delta frame (type 0x01)
+    function decodeDeltaFrame(data,offset,fnum,pxFormat){
+      if(!frameBuf){
+        // No previous frame — request keyframe
+        if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'keyframe'}));
+        return;
+      }
+      var dv=new DataView(data,offset);
+      var blockSize=dv.getUint16(0,true);
+      var cols=dv.getUint16(2,true);
+      var rows=dv.getUint16(4,true);
+      var changedCount=dv.getUint16(6,true);
+      var pos=offset+8;
+      var blockBytes=blockSize*blockSize*BPP;
+
+      for(var i=0;i<changedCount;i++){
+        if(pos+2>data.byteLength)break;
+        var blockIdx=new DataView(data,pos).getUint16(0,true);
+        pos+=2;
+        if(pos+blockBytes>data.byteLength)break;
+
+        var bx=(blockIdx%cols)*blockSize;
+        var by=Math.floor(blockIdx/cols)*blockSize;
+
+        // Copy block pixels into frame buffer
+        var src=new Uint8Array(data,pos,blockBytes);
+        for(var py=0;py<blockSize;py++){
+          var dstOff=((by+py)*W+bx)*BPP;
+          var srcOff=py*blockSize*BPP;
+          for(var px=0;px<blockSize*BPP;px++){
+            frameBuf[dstOff+px]=src[srcOff+px];
+          }
+        }
+        pos+=blockBytes;
+      }
+
+      frameNum=fnum;
+      flushFrame(pxFormat);
+    }
+
+    ws.onmessage=function(e){
+      if(!(e.data instanceof ArrayBuffer))return;
+      if(!mirror)return;
+
+      var data=e.data;
+      if(data.byteLength<8)return;
+
+      var dv=new DataView(data);
+      // Check magic "NZ" (0x4E 0x5A)
+      if(dv.getUint8(0)!==0x4E||dv.getUint8(1)!==0x5A)return;
+
+      var ver=dv.getUint8(2);
+      var frameType=dv.getUint8(3);
+      var fnum=dv.getUint16(4,true);
+      var pxFormat=dv.getUint8(6);
+
+      if(frameType===0x00){
+        decodeFullFrame(data,8,fnum,pxFormat);
+      }else if(frameType===0x01){
+        decodeDeltaFrame(data,8,fnum,pxFormat);
       }
     };
   }

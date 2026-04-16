@@ -74,6 +74,11 @@ public sealed class NezAudioPlayerAndroid : INezAudioPlayer
         _track = null;
     }
 
+    public void SetVolume(double volume)
+    {
+        _track?.SetVolume((float)volume);
+    }
+
     public unsafe void PushSamples(IntPtr samplesPtr, int count)
     {
         if (count <= 0 || !_isRunning) return;

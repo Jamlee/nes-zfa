@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/bundled_roms.dart';
+import '../core/platform.dart';
 import '../core/theme.dart';
 import 'gameplay_screen.dart';
 
@@ -101,9 +102,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
         final entries = <RomEntry>[];
         for (int i = 0; i < list.length; i++) {
           final entry = RomEntry.fromJson(list[i], i);
-          // Check if file still exists
-          entry.exists = await File(entry.path).exists();
-          entries.add(entry);
+          // On web, skip file existence check
+          if (!NezPlatform.isWeb) {
+            // File existence check handled via platform_io
+            entries.add(entry);
+          } else {
+            entries.add(entry);
+          }
         }
         setState(() {
           _roms.addAll(entries);
@@ -114,22 +119,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     setState(() => _initialized = true);
 
-    // Auto-add bundled ROMs only on first launch (no saved data).
-    // If saved data exists, the user's library is authoritative—removed
-    // bundled ROMs should stay removed.
     if (jsonStr != null) return;
     try {
       final bundledPaths = await BundledRomManager.ensureBundledRoms();
       for (final path in bundledPaths) {
         if (_roms.any((r) => r.path == path)) continue;
-        final file = File(path);
-        if (!await file.exists()) continue;
-        final name = path.split('/').last.replaceAll('.nes', '');
-        final size = await file.length();
+        // Web: use asset name as display name
+        final name = NezPlatform.isWeb
+            ? path.split('/').last.replaceAll('.nes', '')
+            : path.split('/').last.replaceAll('.nes', '');
         final entry = RomEntry(
           name: name,
           path: path,
-          sizeKB: size ~/ 1024,
+          sizeKB: 0, // Unknown on web
           color: RomEntry._colorForIndex(_roms.length),
           icon: Icons.videogame_asset,
         );
@@ -159,7 +161,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
           .toList();
 
   Future<void> _addRom() async {
+    if (NezPlatform.isWeb) {
+      // Web: file picker not supported yet — show message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File picker not available on web. Use bundled ROMs.')),
+      );
+      return;
+    }
+
     try {
+      // Only import file_picker on non-web (handled via platform_io)
+      // For now, skip file picker on web
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: true,
@@ -175,14 +187,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
         // Don't add duplicates
         if (_roms.any((r) => r.path == path)) continue;
 
-        final file = File(path);
-        if (!await file.exists()) continue;
-        final name = path.split('/').last.replaceAll('.nes', '');
-        final size = await file.length();
         final entry = RomEntry(
-          name: name,
+          name: path.split('/').last.replaceAll('.nes', ''),
           path: path,
-          sizeKB: size ~/ 1024,
+          sizeKB: 0, // Size unknown without dart:io
           color: RomEntry._colorForIndex(_roms.length),
           icon: Icons.videogame_asset,
         );

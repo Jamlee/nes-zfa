@@ -1,5 +1,7 @@
+using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NezAvalonia.Core;
 
 namespace NezAvalonia.ViewModels;
 
@@ -23,6 +25,11 @@ public partial class MainViewModel : ObservableObject
     public RecordingsViewModel RecordingsVm { get; } = new();
     public SettingsViewModel SettingsVm { get; } = new();
 
+#if !BROWSER
+    // Global gamepad server — lives for the entire app lifetime
+    public GamepadServer? GamepadServerInstance { get; set; }
+#endif
+
     // Navigation to gameplay
     [ObservableProperty]
     private bool _isInGameplay;
@@ -38,12 +45,16 @@ public partial class MainViewModel : ObservableObject
 
     public void LaunchGame(string romPath, string romName)
     {
-        GameplayVm = new GameplayViewModel(romPath, romName) { IsDesktop = IsDesktop };
+        GameplayVm = new GameplayViewModel(romPath, romName, SettingsVm) { IsDesktop = IsDesktop };
         IsInGameplay = true;
     }
 
     public void ExitGameplay()
     {
+        // Unset engine from gamepad server (server keeps running)
+#if !BROWSER
+        GamepadServerInstance?.SetEngine(null);
+#endif
         GameplayVm?.Dispose();
         GameplayVm = null;
         IsInGameplay = false;

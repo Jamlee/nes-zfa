@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background - flat light -->
+  <rect width="1024" height="1024" rx="180" fill="#f8fafc"/>
+
+  <!-- Controller body - flat, simple shape -->
+  <g transform="translate(112, 220)">
+    <path d="M 160 40
+             C 280 10, 520 10, 640 40
+             L 680 80 C 720 115, 720 165, 715 205
+             L 710 420 C 707 505, 658 545, 595 585
+             L 545 618 C 498 650, 455 608, 408 542
+             L 368 490 C 340 452, 300 452, 272 490
+             L 232 542 C 185 608, 142 650, 95 618
+             L 45 585 C -18 545, -28 478, 38 420
+             L 33 205 C 28 165, 28 115, 68 80 Z"
+          fill="#e2e8f0"/>
+
+    <!-- Brand panel area - subtle highlight -->
+    <rect x="255" y="175" width="290" height="178" rx="24" fill="#f1f5f9"/>
+
+    <!-- Nez text - simple, clean -->
+    <text x="390" y="280" text-anchor="middle" dominant-baseline="central"
+          font-family="'SF Pro Display',-apple-system,'Helvetica Neue',Arial,sans-serif"
+          font-size="130" font-weight="800" font-style="italic"
+          fill="#ef4444">N</text>
+    <text x="484" y="264" text-anchor="middle" dominant-baseline="central"
+          font-family="'SF Pro Display',-apple-system,'Helvetica Neue',Arial,sans-serif"
+          font-size="54" font-weight="700" font-style="italic"
+          fill="#94a3b8">ez</text>
+
+    <!-- D-Pad - flat simple cross -->
+    <g transform="translate(160, 238)" fill="#cbd5e1">
+      <rect x="24" y="0" width="32" height="104" rx="8"/>
+      <rect x="0" y="36" width="80" height="32" rx="8"/>
+    </g>
+
+    <!-- AB Buttons - flat circles -->
+    <g transform="translate(538, 245)">
+      <circle cx="66" cy="54" r="37" fill="#fca5a5"/>
+      <text x="66" y="59" text-anchor="middle" dominant-baseline="central"
+            font-family="Arial,sans-serif" font-size="26" font-weight="800" fill="#ffffff">A</text>
+      <circle cx="-6" cy="84" r="37" fill="#fca5a5"/>
+      <text x="-6" y="89" text-anchor="middle" dominant-baseline="central"
+            font-family="Arial,sans-serif" font-size="26" font-weight="800" fill="#ffffff">B</text>
+    </g>
+
+    <!-- Select / Start - minimal pills -->
+    <g transform="translate(330, 405)" fill="#cbd5e1">
+      <rect x="0" y="0" width="60" height="16" rx="8"/>
+      <rect x="86" y="0" width="52" height="16" rx="8"/>
+    </g>
+  </g>
+</svg>

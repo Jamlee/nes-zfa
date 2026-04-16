@@ -114,6 +114,11 @@ pub const Header = packed struct {
             0 => MapperKind.nrom,
             1 => MapperKind.mmc1,
             2 => MapperKind.UxROM,
+            3 => MapperKind.cnrom,
+            4 => MapperKind.mmc3,
+            7 => MapperKind.axrom,
+            40 => MapperKind.mapper40,
+            225 => MapperKind.mapper225,
             else => std.debug.panic("Unsupported mapper: {d}", .{mapper_code}),
         };
     }
@@ -180,6 +185,55 @@ pub const Cart = struct {
         const chr_ram_buf = try allocator.alloc(u8, chr_ram_size);
 
         // I do not support playchoice inst-rom and prom (yet).
+        return .{
+            .header = header,
+            .prg_rom = prg_rom_buf,
+            .chr_rom = chr_rom_buf,
+            .chr_ram = chr_ram_buf,
+            .allocator = allocator,
+            .has_chr_ram = chr_ram_size > 0,
+        };
+    }
+
+    /// Load a cartridge from ROM data in memory (for WASM / web).
+    pub fn loadFromMemory(allocator: Allocator, data: []const u8) !Self {
+        if (data.len < @sizeOf(Header)) return NESError.InvalidROM;
+
+        var header: Header = @bitCast(data[0..@sizeOf(Header)].*);
+
+        if (!header.isValid()) {
+            return NESError.InvalidROM;
+        }
+
+        // Value of 0 = 8KiB PRG RAM.
+        assert(header.prg_ram_size == 0);
+
+        var offset: usize = @sizeOf(Header);
+
+        if (header.flags_6.trainer) {
+            offset += 512;
+        }
+
+        // populate the PRG ROM.
+        const prg_rom_banksize: usize = 16 * 1024;
+        const prg_rom_size: usize = header.prg_rom_banks * prg_rom_banksize;
+        if (offset + prg_rom_size > data.len) return NESError.InvalidROM;
+
+        const prg_rom_buf = try allocator.alloc(u8, prg_rom_size);
+        @memcpy(prg_rom_buf, data[offset .. offset + prg_rom_size]);
+        offset += prg_rom_size;
+
+        const chr_rom_size = @as(usize, header.chr_rom_count) * 8 * 1024;
+        const chr_rom_buf = try allocator.alloc(u8, chr_rom_size);
+        if (chr_rom_size > 0) {
+            if (offset + chr_rom_size > data.len) return NESError.InvalidROM;
+            @memcpy(chr_rom_buf, data[offset .. offset + chr_rom_size]);
+        }
+
+        // When a cart does not have CHR-ROM (e.g: Zelda), it has CHR-RAM which is 8KiB.
+        const chr_ram_size: usize = if (chr_rom_size == 0) 8 * 1024 else 0;
+        const chr_ram_buf = try allocator.alloc(u8, chr_ram_size);
+
         return .{
             .header = header,
             .prg_rom = prg_rom_buf,

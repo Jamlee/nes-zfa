@@ -1,5 +1,7 @@
 const std = @import("std");
-const Mapper = @import("./mapper.zig").Mapper;
+const mapper_mod = @import("./mapper.zig");
+const Mapper = mapper_mod.Mapper;
+const noopStep = mapper_mod.noopStep;
 const Cart = @import("../cart.zig").Cart;
 const CPU = @import("../cpu.zig").CPU;
 const PPU = @import("../ppu/ppu.zig").PPU;
@@ -81,7 +83,7 @@ pub fn init(cart: *Cart, ppu: *PPU) Self {
         .ppu = ppu,
         .cart = cart,
         .prg_rom_bank_count = @truncate(cart.header.prg_rom_banks),
-        .mapper = Mapper.init(read, write, ppuRead, ppuWrite),
+        .mapper = Mapper.init(read, write, ppuRead, ppuWrite, noopStep),
         .has_chr_ram = cart.header.chr_rom_count == 0,
     };
 

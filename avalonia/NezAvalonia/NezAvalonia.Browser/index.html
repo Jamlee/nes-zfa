@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="wwwroot/favicon.png">
+  <title>Nez - NES Emulator</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0A0A0F; }
+    #outOfBrowser { display: none; }
+    .nez-loading {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: #0A0A0F; color: #8888AA;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      z-index: 9999;
+    }
+    .nez-spinner {
+      width: 40px; height: 40px; border: 3px solid #2A2A44;
+      border-top-color: #6C5CE7; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="nez-loading" id="loading">
+    <div class="nez-spinner"></div>
+    <div>Loading Nez...</div>
+  </div>
+
+  <!-- Avalonia content -->
+  <div id="outOfBrowser">
+    <p>This application requires a browser that supports WebAssembly.</p>
+  </div>
+  <canvas id="avaloniaCanvas"></canvas>
+
+  <!-- Nez WASM emulator bridge (same API as Flutter version) -->
+  <script>
+    window.NezWasm = {
+      instance: null,
+      memory: null,
+      exports: null,
+      ready: false,
+
+      async load(url) {
+        try {
+          const response = await fetch(url);
+          const bytes = await response.arrayBuffer();
+          const result = await WebAssembly.instantiate(bytes, {
+            env: {
+              memory: new WebAssembly.Memory({ initial: 256, maximum: 512 }),
+            },
+            wasi_snapshot_preview1: {
+              proc_exit: (code) => console.error('WASI proc_exit:', code),
+              fd_write: (fd, iovs, iovsLen, nwritten) => 0,
+              fd_close: (fd) => 0,
+              fd_seek: (fd, offset, whence, newOffset) => 0,
+              fd_fdstat_get: (fd, stat) => 0,
+              random_get: (buf, bufLen) => {
+                const mem = new Uint8Array(this.memory.buffer);
+                for (let i = buf; i < buf + bufLen; i++) mem[i] = Math.random() * 256 | 0;
+                return 0;
+              },
+              clock_time_get: (clockId, precision, timePtr) => {
+                const mem = new DataView(this.memory.buffer);
+                mem.setBigUint64(timePtr, BigInt(Date.now()) * 1000000n, true);
+                return 0;
+              },
+              environ_sizes_get: (countPtr, bufLenPtr) => 0,
+              environ_get: (environPtr, bufPtr) => 0,
+            },
+          });
+          this.instance = result.instance;
+          this.exports = result.instance.exports;
+          this.memory = this.exports.memory;
+          this.ready = true;
+          console.log('NEZ WASM loaded, exports:', Object.keys(this.exports));
+          return true;
+        } catch (e) {
+          console.error('NEZ WASM load error:', e);
+          return false;
+        }
+      },
+
+      loadRom(data) {
+        if (!this.ready) return false;
+        const ptr = this.exports.nez_alloc_rom(data.length);
+        if (!ptr) return false;
+        const mem = new Uint8Array(this.memory.buffer);
+        mem.set(new Uint8Array(data), ptr);
+        const consolePtr = this.exports.nez_create_from_memory(ptr, data.length);
+        this.exports.nez_free_rom(ptr, data.length);
+        return consolePtr !== 0;
+      },
+
+      update(dtMs) {
+        if (!this.ready) return;
+        this.exports.nez_update(0, dtMs);
+      },
+
+      setButtons(bitmask) {
+        if (!this.ready) return;
+        this.exports.nez_input_set_buttons(0, bitmask);
+      },
+
+      getFrameBuffer() {
+        if (!this.ready) return null;
+        const ptr = this.exports.nez_framebuffer_get(0);
+        if (ptr === 0) return null;
+        return new Uint8Array(this.memory.buffer, ptr, 256 * 240 * 3);
+      },
+
+      getAudioSamples(maxSamples) {
+        if (!this.ready) return null;
+        const bufPtr = this.exports.nez_alloc_rom(maxSamples * 2);
+        const count = this.exports.nez_audio_queue_drain(0, bufPtr, maxSamples);
+        if (count === 0) {
+          this.exports.nez_free_rom(bufPtr, maxSamples * 2);
+          return null;
+        }
+        const samples = new Int16Array(this.memory.buffer, bufPtr, count);
+        const copy = new Int16Array(samples);
+        this.exports.nez_free_rom(bufPtr, maxSamples * 2);
+        return copy;
+      },
+
+      setPause(paused) {
+        if (!this.ready) return;
+        this.exports.nez_set_pause(0, paused ? 1 : 0);
+      },
+
+      get screenWidth() { return this.ready ? this.exports.nez_screen_width() : 256; },
+      get screenHeight() { return this.ready ? this.exports.nez_screen_height() : 240; },
+    };
+  </script>
+
+  <!-- Avalonia WASM bootstrapper -->
+  <script src="main.js"></script>
+
+  <script>
+    // Load NEZ WASM emulator asynchronously
+    (async function() {
+      try {
+        await window.NezWasm.load('wwwroot/nez_emu.wasm');
+        console.log('NEZ WASM ready');
+      } catch (e) {
+        console.error('NEZ WASM failed to load:', e);
+      }
+    })();
+
+    // Hide loading when Avalonia is ready
+    window.addEventListener('avalonia-load', () => {
+      var el = document.getElementById('loading');
+      if (el) el.style.display = 'none';
+    });
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('gesturechange', e => e.preventDefault());
+  </script>
+</body>
+</html>

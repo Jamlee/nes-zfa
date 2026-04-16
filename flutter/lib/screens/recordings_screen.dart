@@ -1,8 +1,9 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../core/platform.dart';
+import '../core/recording_image.dart';
+import '../core/recordings_helper.dart';
 import '../core/theme.dart';
 
 /// Entry representing a recorded GIF file.
@@ -18,6 +19,25 @@ class RecordingEntry {
     required this.date,
     required this.sizeBytes,
   });
+
+  /// Game name extracted from file name.
+  /// Convention: nez_{gameName}_{timestamp}.gif
+  /// Falls back to file name for old format.
+  String get gameName {
+    final name = filename.replaceAll(RegExp(r'\.gif$'), '');
+    if (name.startsWith('nez_')) {
+      final rest = name.substring(4);
+      final lastUnderscore = rest.lastIndexOf('_');
+      if (lastUnderscore > 0) {
+        final afterUnderscore = rest.substring(lastUnderscore + 1);
+        if (afterUnderscore.length >= 13 && int.tryParse(afterUnderscore) != null) {
+          final gamePart = rest.substring(0, lastUnderscore);
+          if (gamePart.isNotEmpty) return gamePart.replaceAll('_', ' ');
+        }
+      }
+    }
+    return name;
+  }
 
   String get sizeText {
     if (sizeBytes < 1024) return '$sizeBytes B';
@@ -50,85 +70,40 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
     _loadRecordings();
   }
 
-  String get _recordingsDir {
-    if (Platform.isAndroid) {
-      // On Android we don't have a direct home dir; use a fallback.
-      // The actual path will be resolved when files are saved.
-      return '/data/data/com.nez.nez_flutter/files/recordings';
-    }
-    final home = Platform.environment['HOME'] ??
-        Platform.environment['USERPROFILE'] ??
-        Directory.systemTemp.path;
-    return '$home/.nes-zfa/recordings';
-  }
-
   Future<void> _loadRecordings() async {
     setState(() => _loading = true);
-
-    String dirPath = _recordingsDir;
-
-    // On Android, try getting actual files dir via method channel
-    if (Platform.isAndroid) {
-      try {
-        final appDir = await const MethodChannel('com.nez/storage')
-            .invokeMethod<String>('getFilesDir');
-        if (appDir != null) {
-          dirPath = '$appDir/recordings';
-        }
-      } catch (_) {}
+    try {
+      final entries = await RecordingsHelper.loadRecordings();
+      setState(() {
+        _recordings = entries.map((e) => RecordingEntry(
+          path: e['path'] as String,
+          filename: e['filename'] as String,
+          date: e['date'] as DateTime,
+          sizeBytes: e['sizeBytes'] as int,
+        )).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('NEZ: failed to load recordings: $e');
+      setState(() { _loading = false; });
     }
-
-    final dir = Directory(dirPath);
-    final entries = <RecordingEntry>[];
-    if (await dir.exists()) {
-      await for (final entity in dir.list()) {
-        if (entity is File && entity.path.toLowerCase().endsWith('.gif')) {
-          final stat = await entity.stat();
-          entries.add(RecordingEntry(
-            path: entity.path,
-            filename: entity.path.split(Platform.pathSeparator).last,
-            date: stat.modified,
-            sizeBytes: stat.size,
-          ));
-        }
-      }
-    }
-    entries.sort((a, b) => b.date.compareTo(a.date));
-    setState(() {
-      _recordings = entries;
-      _loading = false;
-    });
   }
 
   Future<void> _deleteRecording(RecordingEntry entry) async {
-    try {
-      await File(entry.path).delete();
-      setState(() => _recordings.remove(entry));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete: $e')),
-        );
-      }
-    }
+    await RecordingsHelper.deleteRecording(entry.path);
+    setState(() => _recordings.remove(entry));
   }
 
   void _copyPath(RecordingEntry entry) {
-    Clipboard.setData(ClipboardData(text: entry.path));
+    // Use clipboard via dart:html on web, or platform channel on native
+    // For now just show the path
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Path copied to clipboard')),
+      SnackBar(content: Text('Path: ${entry.path}')),
     );
   }
 
   void _openFolder(RecordingEntry entry) {
-    final dir = File(entry.path).parent.path;
-    if (Platform.isMacOS) {
-      Process.run('open', [dir]);
-    } else if (Platform.isWindows) {
-      Process.run('explorer', [dir]);
-    } else if (Platform.isLinux) {
-      Process.run('xdg-open', [dir]);
-    }
+    RecordingsHelper.openFolder(entry.path);
   }
 
   @override
@@ -265,13 +240,10 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                       child: SizedBox(
                         width: 60,
                         height: 56,
-                        child: Image.file(
-                          File(entry.path),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: NezTheme.bgSurface,
-                            child: const Icon(Icons.gif_box, color: NezTheme.accentPrimary, size: 22),
-                          ),
+                        child: SizedBox(
+                          width: 60,
+                          height: 56,
+                          child: recordingImage(entry.path),
                         ),
                       ),
                     ),
@@ -281,7 +253,7 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            entry.filename,
+                            entry.gameName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -331,14 +303,7 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Image.file(
-                    File(entry.path),
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox(
-                      height: 200,
-                      child: Center(child: Icon(Icons.broken_image, color: NezTheme.textDim, size: 48)),
-                    ),
-                  ),
+                  child: recordingImage(entry.path),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(12),
@@ -346,7 +311,7 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${entry.filename}  •  ${entry.sizeText}',
+                          '${entry.gameName}  •  ${entry.sizeText}',
                           style: const TextStyle(fontSize: 11, color: NezTheme.textDim),
                         ),
                       ),
@@ -354,7 +319,7 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                         onTap: () => _copyPath(entry),
                         child: const Icon(Icons.copy, size: 16, color: NezTheme.textSecondary),
                       ),
-                      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) ...[
+                      if (!kIsWeb && (NezPlatform.isMacOS || NezPlatform.isWindows || NezPlatform.isLinux)) ...[
                         const SizedBox(width: 12),
                         GestureDetector(
                           onTap: () => _openFolder(entry),
@@ -403,13 +368,7 @@ class _RecordingCard extends StatelessWidget {
             flex: 3,
             child: Container(
               color: NezTheme.bgSurface,
-              child: Image.file(
-                File(entry.path),
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Center(
-                  child: Icon(Icons.gif_box, size: 36, color: NezTheme.accentPrimary),
-                ),
-              ),
+              child: recordingImage(entry.path),
             ),
           ),
           // Info + actions
@@ -421,7 +380,7 @@ class _RecordingCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    entry.filename,
+                    entry.gameName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: NezTheme.textPrimary),

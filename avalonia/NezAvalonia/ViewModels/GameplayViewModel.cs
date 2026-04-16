@@ -10,12 +10,15 @@ namespace NezAvalonia.ViewModels;
 /// <summary>
 /// Gameplay state: manages NezEngine, keyboard input, debug panel.
 /// Mirrors the Flutter GameplayScreen state exactly.
+/// Consumes SettingsViewModel to apply user preferences in real-time.
 /// </summary>
 public partial class GameplayViewModel : ObservableObject, IDisposable
 {
-    private readonly NezEngine _engine = new();
+    private readonly INezEngine _engine;
+    private readonly SettingsViewModel _settings;
 
-    public NezEngine Engine => _engine;
+    public INezEngine Engine => _engine;
+    public SettingsViewModel Settings => _settings;
     public string RomName { get; }
     public string RomPath { get; }
 
@@ -31,26 +34,78 @@ public partial class GameplayViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _errorMessage = string.Empty;
 
-    public GameplayViewModel(string romPath, string romName)
+    public GameplayViewModel(string romPath, string romName, SettingsViewModel settings)
     {
         RomPath = romPath;
         RomName = romName;
+        _settings = settings;
+        _engine = NezEngineFactory.Create();
 
         _engine.FrameReady += () =>
         {
             OnPropertyChanged(nameof(Engine));
         };
+
+        // Apply current settings to engine
+        ApplySettingsToEngine();
+
+        // Subscribe to settings changes
+        _settings.PropertyChanged += OnSettingsPropertyChanged;
+
+        // Initialize debug panel from settings
+        ShowDebugPanel = _settings.DebugMode;
+    }
+
+    private void OnSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(Settings.SoundEnabled):
+            case nameof(Settings.Volume):
+                ApplyAudioSettings();
+                break;
+            case nameof(Settings.DebugMode):
+                ShowDebugPanel = Settings.DebugMode;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Apply all settings to the engine. Called once at init.
+    /// </summary>
+    private void ApplySettingsToEngine()
+    {
+        ApplyAudioSettings();
+    }
+
+    private void ApplyAudioSettings()
+    {
+        _engine.SetSoundEnabled(_settings.SoundEnabled);
+        _engine.SetVolume(_settings.Volume);
     }
 
     public void Initialize()
     {
+#if BROWSER
+        // On browser, ROM must be loaded from bytes (not file path)
+        // The LoadRom method with file path won't work on WASM.
+        // Use LoadRomFromBytes instead, called from the browser host.
+        if (_engine is NezWasmEngine wasmEngine)
+        {
+            // Browser loading is handled by the UI layer
+            return;
+        }
+#else
         if (!_engine.LoadRom(RomPath))
         {
             HasError = true;
             ErrorMessage = _engine.LoadError ?? "Unknown error loading ROM";
             return;
         }
+#endif
         _engine.StartLoop();
+        // Apply audio settings after loop starts (player is created in StartLoop)
+        ApplyAudioSettings();
     }
 
     /// <summary>
@@ -127,13 +182,14 @@ public partial class GameplayViewModel : ObservableObject, IDisposable
         }
         else
         {
-            _engine.StartRecording();
+            _engine.StartRecording(RomName);
             IsRecording = true;
         }
     }
 
     public void Dispose()
     {
+        _settings.PropertyChanged -= OnSettingsPropertyChanged;
         _engine.Dispose();
     }
 }

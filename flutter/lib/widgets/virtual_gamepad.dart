@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../core/nez_bindings.dart';
+import '../core/nez_bindings_stub.dart' if (dart.library.io) '../core/nez_bindings_native.dart';
 import '../core/theme.dart';
 
 /// Callback for button state changes.

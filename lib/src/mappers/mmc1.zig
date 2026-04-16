@@ -1,5 +1,7 @@
 const std = @import("std");
-const Mapper = @import("./mapper.zig").Mapper;
+const mapper_mod = @import("./mapper.zig");
+const Mapper = mapper_mod.Mapper;
+const noopStep = mapper_mod.noopStep;
 const Cart = @import("../cart.zig").Cart;
 const CPU = @import("../cpu.zig").CPU;
 const PPU = @import("../ppu/ppu.zig").PPU;
@@ -216,7 +218,7 @@ pub const MMC1 = struct {
             .has_chr_ram = cart.header.chr_rom_count == 0,
             .prg_rom_bank_count = @truncate(cart.header.prg_rom_banks),
             .chr_rom_bank_count = @truncate(cart.header.chr_rom_count),
-            .mapper = Mapper.init(read, write, ppuRead, ppuWrite),
+            .mapper = Mapper.init(read, write, ppuRead, ppuWrite, noopStep),
             // these are initialized when `updateBankOffsets` is called below.
             .prg_rom_lo = undefined,
             .prg_rom_hi = undefined,

@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -9,12 +10,20 @@ namespace NezAvalonia.Controls;
 /// <summary>
 /// Custom control that renders the NES framebuffer via WriteableBitmap.
 /// Mirrors the Flutter NesDisplay widget: nearest-neighbor scaling, FPS overlay.
+/// Supports AspectRatio and PixelFilter settings.
 /// </summary>
 public class NesDisplay : Control
 {
     private WriteableBitmap? _bitmap;
     private int _fps;
     private bool _showFps = true;
+    private string _aspectRatio = "4:3 Original";
+    private string _pixelFilter = "None";
+
+    // CRT scanline effect: pre-built semi-transparent brush for even rows
+    private static readonly IBrush ScanlineBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+    // LCD grid effect: thin dark lines every 3rd pixel
+    private static readonly IBrush LcdGridBrush = new SolidColorBrush(Color.FromArgb(25, 0, 0, 0));
 
     public NesDisplay()
     {
@@ -37,6 +46,21 @@ public class NesDisplay : Control
         _showFps = show;
     }
 
+    public void SetAspectRatio(string aspectRatio)
+    {
+        _aspectRatio = aspectRatio;
+        InvalidateVisual();
+    }
+
+    public void SetPixelFilter(string pixelFilter)
+    {
+        _pixelFilter = pixelFilter;
+        // Use linear interpolation for filter effects, nearest-neighbor for "None"
+        RenderOptions.SetBitmapInterpolationMode(this,
+            _pixelFilter == "None" ? BitmapInterpolationMode.None : BitmapInterpolationMode.HighQuality);
+        InvalidateVisual();
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -49,32 +73,57 @@ public class NesDisplay : Control
 
         if (_bitmap != null)
         {
-            // Calculate aspect-fit rect (4:3 for NES 256x240)
+            // Calculate draw rect based on aspect ratio setting
             double srcW = _bitmap.PixelSize.Width;
             double srcH = _bitmap.PixelSize.Height;
-            double srcAspect = srcW / srcH;
-            double dstAspect = bounds.Width / bounds.Height;
+            double nesAspect = srcW / srcH; // 256/240 ≈ 1.0667
 
             double drawW, drawH;
-            if (dstAspect > srcAspect)
+
+            switch (_aspectRatio)
             {
-                drawH = bounds.Height;
-                drawW = drawH * srcAspect;
-            }
-            else
-            {
-                drawW = bounds.Width;
-                drawH = drawW / srcAspect;
+                case "16:9 Stretch":
+                    // Fill the entire bounds, ignoring original aspect
+                    drawW = bounds.Width;
+                    drawH = bounds.Height;
+                    break;
+
+                case "Pixel Perfect":
+                    // Integer scaling: find the largest integer scale that fits
+                    int scaleX = Math.Max(1, (int)(bounds.Width / srcW));
+                    int scaleY = Math.Max(1, (int)(bounds.Height / srcH));
+                    int scale = Math.Min(scaleX, scaleY);
+                    drawW = srcW * scale;
+                    drawH = srcH * scale;
+                    break;
+
+                default: // "4:3 Original"
+                    // Fit preserving NES aspect ratio
+                    double dstAspect = bounds.Width / bounds.Height;
+                    if (dstAspect > nesAspect)
+                    {
+                        drawH = bounds.Height;
+                        drawW = drawH * nesAspect;
+                    }
+                    else
+                    {
+                        drawW = bounds.Width;
+                        drawH = drawW / nesAspect;
+                    }
+                    break;
             }
 
             double x = (bounds.Width - drawW) / 2;
-            double y = 0; // Top-aligned, no gap above game
+            double y = (bounds.Height - drawH) / 2;
 
             var sourceRect = new Rect(0, 0, srcW, srcH);
             var destRect = new Rect(x, y, drawW, drawH);
 
-            // Nearest-neighbor already set in constructor
+            // Interpolation mode is already set via RenderOptions
             context.DrawImage(_bitmap, sourceRect, destRect);
+
+            // Apply pixel filter overlay
+            ApplyPixelFilter(context, destRect, drawW, drawH);
         }
         else
         {
@@ -117,12 +166,46 @@ public class NesDisplay : Control
         }
     }
 
+    /// <summary>
+    /// Apply CRT scanline or LCD grid overlay effect after drawing the bitmap.
+    /// </summary>
+    private void ApplyPixelFilter(DrawingContext context, Rect destRect, double drawW, double drawH)
+    {
+        if (_pixelFilter == "CRT Scanline")
+        {
+            // Draw semi-transparent dark lines every 2 pixels (simulating scanlines)
+            double step = Math.Max(2, drawH / 120); // Scale step with display size
+            using var clip = context.PushClip(destRect);
+            for (double y = destRect.Top; y < destRect.Bottom; y += step)
+            {
+                context.DrawRectangle(ScanlineBrush, null,
+                    new Rect(destRect.Left, y, drawW, step * 0.5));
+            }
+        }
+        else if (_pixelFilter == "LCD Grid")
+        {
+            // Draw a subtle grid pattern
+            double step = Math.Max(3, drawH / 80);
+            using var clip = context.PushClip(destRect);
+            for (double y = destRect.Top; y < destRect.Bottom; y += step)
+            {
+                context.DrawRectangle(LcdGridBrush, null,
+                    new Rect(destRect.Left, y, drawW, 1));
+            }
+            for (double x = destRect.Left; x < destRect.Right; x += step)
+            {
+                context.DrawRectangle(LcdGridBrush, null,
+                    new Rect(x, destRect.Top, 1, drawH));
+            }
+        }
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
-        const double aspect = 256.0 / 240.0;
+        double aspect = GetTargetAspect();
 
         if (double.IsInfinity(availableSize.Width) && double.IsInfinity(availableSize.Height))
-            return new Size(512, 480);
+            return new Size(512, 512 / aspect);
         if (double.IsInfinity(availableSize.Width))
             return new Size(availableSize.Height * aspect, availableSize.Height);
         if (double.IsInfinity(availableSize.Height))
@@ -137,5 +220,15 @@ public class NesDisplay : Control
             fitW = fitH * aspect;
         }
         return new Size(fitW, fitH);
+    }
+
+    private double GetTargetAspect()
+    {
+        return _aspectRatio switch
+        {
+            "16:9 Stretch" => 16.0 / 9.0,
+            "Pixel Perfect" => 256.0 / 240.0,
+            _ => 256.0 / 240.0 // "4:3 Original"
+        };
     }
 }

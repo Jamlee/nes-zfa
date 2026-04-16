@@ -48,9 +48,15 @@ flutter/android/app/src/main/jniLibs/
 # ROMs
 *.nes
 rom/
+roms/
+flutter/roms
+avalonia/**/roms
 
 # Misc
 .claude/
 .env
 *.local
 *.mp4
+
+out/
+tmp/

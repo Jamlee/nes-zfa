@@ -473,7 +473,8 @@ fn mixVolume(pulse1: f32, pulse2: f32) i16 {
 
     if (mixer_out > mixer_max) {
         mixer_max = mixer_out;
-        std.debug.print("mixer out: {d} (pulse: {d})\n", .{ mixer_out, pulse1 + pulse2 });
+        // Use a simple volatile write instead of std.debug.print to avoid
+        // pulling in std.Io (which requires POSIX and doesn't work on wasm32-freestanding)
     }
 
     // scale to 16-bit

@@ -14,6 +14,7 @@ public enum GamepadMode { Full, JoystickOnly, ButtonsOnly }
 /// Virtual gamepad for touch/mobile input.
 /// Landscape layout: Left joystick | Center SELECT/START | Right A/B/TA/TB diamond.
 /// Matches Flutter VirtualGamepad layout.
+/// Supports ButtonSize and ButtonOpacity settings.
 /// </summary>
 public class VirtualGamepad : UserControl
 {
@@ -30,6 +31,22 @@ public class VirtualGamepad : UserControl
         set => SetValue(ModeProperty, value);
     }
 
+    // Settings-driven properties
+    private string _buttonSize = "Medium";
+    private double _buttonOpacity = 0.7;
+
+    public void SetButtonSize(string size)
+    {
+        _buttonSize = size;
+        if (IsLoaded) BuildUI();
+    }
+
+    public void SetButtonOpacity(double opacity)
+    {
+        _buttonOpacity = opacity;
+        if (IsLoaded) BuildUI();
+    }
+
     public VirtualGamepad()
     {
         // Build UI on loaded to respect Mode property
@@ -44,10 +61,12 @@ public class VirtualGamepad : UserControl
     private void BuildUI()
     {
         var mode = Mode;
+        double joySize = GetJoystickSize();
+        double btnSize = GetButtonSize();
 
         if (mode == GamepadMode.JoystickOnly)
         {
-            var joystick = new JoystickControl { Width = 150, Height = 150 };
+            var joystick = new JoystickControl { Width = joySize, Height = joySize };
             joystick.DirectionChanged += (up, down, left, right) =>
             {
                 ButtonChanged?.Invoke(NezBindings.ButtonUp, up);
@@ -70,7 +89,7 @@ public class VirtualGamepad : UserControl
             {
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Children = { CreateDiamondButtons() },
+                Children = { CreateDiamondButtons(btnSize) },
             };
             return;
         }
@@ -81,7 +100,7 @@ public class VirtualGamepad : UserControl
             ColumnDefinitions = ColumnDefinitions.Parse("*,*"),
         };
 
-        var joy = new JoystickControl { Width = 150, Height = 150 };
+        var joy = new JoystickControl { Width = joySize, Height = joySize };
         joy.DirectionChanged += (up, down, left, right) =>
         {
             ButtonChanged?.Invoke(NezBindings.ButtonUp, up);
@@ -99,7 +118,7 @@ public class VirtualGamepad : UserControl
         root.Children.Add(leftPanel);
         Grid.SetColumn(leftPanel, 0);
 
-        var actionPanel = CreateDiamondButtons();
+        var actionPanel = CreateDiamondButtons(btnSize);
         var rightPanel = new Panel
         {
             HorizontalAlignment = HorizontalAlignment.Right,
@@ -113,17 +132,32 @@ public class VirtualGamepad : UserControl
         Content = root;
     }
 
+    private double GetButtonSize() => _buttonSize switch
+    {
+        "Small" => 40,
+        "Large" => 72,
+        _ => 56 // Medium
+    };
+
+    private double GetJoystickSize() => _buttonSize switch
+    {
+        "Small" => 110,
+        "Large" => 190,
+        _ => 150 // Medium
+    };
+
     /// <summary>
     /// Diamond layout: TA top, TB left, A right, B bottom.
-    /// Matches Flutter _ActionButtons with offset=52, btnSize=56.
+    /// Matches Flutter _ActionButtons with offset, btnSize driven by settings.
     /// </summary>
-    private Panel CreateDiamondButtons()
+    private Panel CreateDiamondButtons(double btnSize)
     {
-        const double btnSize = 56;
-        const double offset = 52;
-        const double areaSize = btnSize + offset * 2; // 160
+        const double offsetRatio = 52.0 / 56.0; // offset proportional to default btnSize
+        double offset = btnSize * offsetRatio;
+        double areaSize = btnSize + offset * 2;
         double center = areaSize / 2;
         double half = btnSize / 2;
+        double opacity = _buttonOpacity;
 
         var canvas = new Canvas
         {
@@ -134,7 +168,7 @@ public class VirtualGamepad : UserControl
         };
 
         // TA - top
-        var ta = CreateRoundButton("TA", btnSize, Color.Parse("#FF8A80"), true);
+        var ta = CreateRoundButton("TA", btnSize, Color.Parse("#FF8A80"), true, opacity);
         Canvas.SetLeft(ta, center - half);
         Canvas.SetTop(ta, center - offset - half);
         ta.PointerPressed += (_, _) => TurboAChanged?.Invoke(true);
@@ -143,7 +177,7 @@ public class VirtualGamepad : UserControl
         canvas.Children.Add(ta);
 
         // B - bottom
-        var b = CreateRoundButton("B", btnSize, Color.Parse("#FFA726"), false);
+        var b = CreateRoundButton("B", btnSize, Color.Parse("#FFA726"), false, opacity);
         Canvas.SetLeft(b, center - half);
         Canvas.SetTop(b, center + offset - half);
         b.PointerPressed += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonB, true);
@@ -152,7 +186,7 @@ public class VirtualGamepad : UserControl
         canvas.Children.Add(b);
 
         // TB - left
-        var tb = CreateRoundButton("TB", btnSize, Color.Parse("#FFCC80"), true);
+        var tb = CreateRoundButton("TB", btnSize, Color.Parse("#FFCC80"), true, opacity);
         Canvas.SetLeft(tb, center - offset - half);
         Canvas.SetTop(tb, center - half);
         tb.PointerPressed += (_, _) => TurboBChanged?.Invoke(true);
@@ -161,7 +195,7 @@ public class VirtualGamepad : UserControl
         canvas.Children.Add(tb);
 
         // A - right
-        var a = CreateRoundButton("A", btnSize, Color.Parse("#EF5350"), false);
+        var a = CreateRoundButton("A", btnSize, Color.Parse("#EF5350"), false, opacity);
         Canvas.SetLeft(a, center + offset - half);
         Canvas.SetTop(a, center - half);
         a.PointerPressed += (_, _) => ButtonChanged?.Invoke(NezBindings.ButtonA, true);
@@ -172,30 +206,39 @@ public class VirtualGamepad : UserControl
         return canvas;
     }
 
-    private static Border CreateRoundButton(string label, double size, Color color, bool outline)
+    private static Border CreateRoundButton(string label, double size, Color color, bool outline, double opacity)
     {
+        var bgColor = outline ? Colors.Transparent : color;
+        var borderColor = color;
+        var fgColor = outline ? color : Colors.White;
+
+        // Apply opacity to all colors
+        byte alpha = (byte)(opacity * 255);
+        var bgBrush = new SolidColorBrush(Color.FromArgb(alpha, bgColor.R, bgColor.G, bgColor.B));
+        var borderBrush = new SolidColorBrush(Color.FromArgb(alpha, borderColor.R, borderColor.G, borderColor.B));
+        var fgBrush = new SolidColorBrush(Color.FromArgb(alpha, fgColor.R, fgColor.G, fgColor.B));
+        var shadowColor = Color.FromArgb((byte)(alpha * 80 / 255), color.R, color.G, color.B);
+
         var border = new Border
         {
             Width = size,
             Height = size,
             CornerRadius = new CornerRadius(size / 2),
-            Background = outline
-                ? Brushes.Transparent
-                : new SolidColorBrush(color),
-            BorderBrush = new SolidColorBrush(color),
+            Background = bgBrush,
+            BorderBrush = borderBrush,
             BorderThickness = new Thickness(outline ? 2.5 : 0),
             Child = new TextBlock
             {
                 Text = label,
-                FontSize = label.Length > 1 ? 14 : 18,
+                FontSize = label.Length > 1 ? (size < 50 ? 10 : 14) : (size < 50 ? 14 : 18),
                 FontWeight = FontWeight.Bold,
-                Foreground = outline ? new SolidColorBrush(color) : Brushes.White,
+                Foreground = fgBrush,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
             },
             BoxShadow = new BoxShadows(new BoxShadow
             {
-                Color = Color.FromArgb(80, color.R, color.G, color.B),
+                Color = shadowColor,
                 Blur = 10,
             }),
         };

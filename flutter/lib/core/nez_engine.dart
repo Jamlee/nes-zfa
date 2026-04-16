@@ -243,10 +243,19 @@ class NezEngine extends ChangeNotifier {
 
   // ---- GIF Recording ----
 
-  void startRecording() {
+  String _recordingRomName = '';
+
+  void startRecording([String romName = '']) {
+    _recordingRomName = _sanitizeFileName(romName);
     _recordedFrames.clear();
     _recording = true;
     notifyListeners();
+  }
+
+  static String _sanitizeFileName(String name) {
+    var n = name.replaceAll(RegExp(r'\.nes$'), '').trim();
+    n = n.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    return n.replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
   }
 
   /// Stop recording and encode to GIF. Returns file path or null.
@@ -270,7 +279,8 @@ class NezEngine extends ChangeNotifier {
     }
 
     // Encode in background isolate
-    return compute(_encodeGifIsolate, _GifParams(w, h, frames, appDir: appDir));
+    final romName = _recordingRomName;
+    return compute(_encodeGifIsolate, _GifParams(w, h, frames, appDir: appDir, romName: romName));
   }
 
   /// Stop and clean up.
@@ -289,7 +299,8 @@ class _GifParams {
   final int w, h;
   final List<Uint8List> frames;
   final String? appDir;
-  _GifParams(this.w, this.h, this.frames, {this.appDir});
+  final String romName;
+  _GifParams(this.w, this.h, this.frames, {this.appDir, this.romName = ''});
 }
 
 String? _encodeGifIsolate(_GifParams p) {
@@ -327,7 +338,8 @@ String? _encodeGifIsolate(_GifParams p) {
     }
     Directory(dirPath).createSync(recursive: true);
 
-    final path = '$dirPath/nez_${DateTime.now().millisecondsSinceEpoch}.gif';
+    final namePart = p.romName.isEmpty ? '' : '${p.romName}_';
+    final path = '$dirPath/nez_${namePart}${DateTime.now().millisecondsSinceEpoch}.gif';
     File(path).writeAsBytesSync(encoded);
     return path;
   } catch (_) {

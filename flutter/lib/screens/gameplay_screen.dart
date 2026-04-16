@@ -1,15 +1,15 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../core/gamepad_server.dart';
-import '../core/nez_bindings.dart';
-import '../core/nez_engine.dart';
+import '../core/nez_engine_stub.dart' if (dart.library.io) '../core/nez_engine_native.dart';
+import '../core/nez_bindings_stub.dart' if (dart.library.io) '../core/nez_bindings_native.dart';
+import '../core/gamepad_server_stub.dart' if (dart.library.io) '../core/gamepad_server_native.dart';
+import '../core/platform.dart';
 import '../core/theme.dart';
-import '../widgets/key_hints.dart';
 import '../widgets/nes_display.dart';
+import '../widgets/key_hints.dart';
 import '../widgets/virtual_gamepad.dart';
 
 /// Gameplay screen - shows the NES display and controls.
@@ -87,13 +87,13 @@ class _GameplayScreenState extends State<GameplayScreen>
         );
       }
     } else {
-      _engine.startRecording();
+      _engine.startRecording(widget.romName);
     }
     setState(() {});
   }
 
   Future<void> _fitWindow() async {
-    if (!Platform.isMacOS) return;
+    if (kIsWeb || !NezPlatform.isMacOS) return;
     try {
       await const MethodChannel('com.nez/window')
           .invokeMethod('fitToAspectRatio', {'chromeHeight': 80.0});
@@ -105,7 +105,7 @@ class _GameplayScreenState extends State<GameplayScreen>
   // ---- Keyboard handling for macOS ----
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (!Platform.isMacOS && !Platform.isLinux && !Platform.isWindows) {
+    if (kIsWeb || (!NezPlatform.isMacOS && !NezPlatform.isLinux && !NezPlatform.isWindows)) {
       return KeyEventResult.ignored;
     }
 
@@ -168,7 +168,7 @@ class _GameplayScreenState extends State<GameplayScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = Platform.isMacOS || Platform.isLinux || Platform.isWindows || MediaQuery.of(context).size.width > 800;
+    final isDesktop = !kIsWeb && (NezPlatform.isDesktop || MediaQuery.of(context).size.width > 800);
 
     return Focus(
       autofocus: true,
@@ -193,9 +193,9 @@ class _GameplayScreenState extends State<GameplayScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, size: 48, color: NezTheme.accentRed),
+          Icon(Icons.error_outline, size: 48, color: NezTheme.accentRed),
           const SizedBox(height: 12),
-          Text(_error!, style: const TextStyle(color: NezTheme.textSecondary)),
+          Text(_error!, style: TextStyle(color: NezTheme.textSecondary)),
           const SizedBox(height: 16),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -257,7 +257,7 @@ class _GameplayScreenState extends State<GameplayScreen>
               ),
             ),
         // Keybindings bar
-        const KeybindingsBar(),
+        KeybindingsBar(),
       ],
     ),
     // QR overlay
@@ -274,7 +274,7 @@ class _GameplayScreenState extends State<GameplayScreen>
   }
 
   Widget _buildQrOverlay() {
-    final isDesktop = Platform.isMacOS || Platform.isLinux || Platform.isWindows;
+    final isDesktop = !kIsWeb && NezPlatform.isDesktop;
     final p1Url = isDesktop ? _gamepadServer.p1Url : _gamepadServer.p1MirrorUrl;
     final p2Url = isDesktop ? _gamepadServer.p2Url : _gamepadServer.p2MirrorUrl;
 
@@ -301,7 +301,7 @@ class _GameplayScreenState extends State<GameplayScreen>
                   const SizedBox(height: 4),
                   Text(
                     _gamepadServer.localIp ?? '',
-                    style: const TextStyle(fontSize: 11, color: NezTheme.textDim),
+                    style: TextStyle(fontSize: 11, color: NezTheme.textDim),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -315,7 +315,7 @@ class _GameplayScreenState extends State<GameplayScreen>
                   const SizedBox(height: 16),
                   Text(
                     isDesktop ? 'Gamepad only' : 'Gamepad + mirrored display',
-                    style: const TextStyle(fontSize: 10, color: NezTheme.textDim),
+                    style: TextStyle(fontSize: 10, color: NezTheme.textDim),
                   ),
                 ],
               ),
@@ -434,7 +434,7 @@ class _GameplayScreenState extends State<GameplayScreen>
                         children: [
                           GestureDetector(
                             onTap: () => Navigator.pop(context),
-                            child: const Text('← Back', style: TextStyle(color: NezTheme.accentSecondary, fontSize: 12, shadows: [Shadow(blurRadius: 4)])),
+                            child: Text('← Back', style: TextStyle(color: NezTheme.accentSecondary, fontSize: 12, shadows: [Shadow(blurRadius: 4)])),
                           ),
                           const SizedBox(width: 12),
                           Text(widget.romName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, shadows: [Shadow(blurRadius: 4)])),
@@ -523,15 +523,15 @@ class _DesktopToolbar extends StatelessWidget {
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(
-        color: Color(0xF00F0F1A),
+      decoration: BoxDecoration(
+        color: const Color(0xF00F0F1A),
         border: Border(bottom: BorderSide(color: NezTheme.border)),
       ),
       child: Row(
         children: [
           _ToolbarBtn(icon: Icons.arrow_back, label: 'Library', kbd: 'Esc', onTap: onBack),
           const SizedBox(width: 8),
-          Text(romName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: NezTheme.textSecondary)),
+          Text(romName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: NezTheme.textSecondary)),
           const Spacer(),
           _ToolbarBtn(
             icon: isPaused ? Icons.play_arrow : Icons.pause,
@@ -625,8 +625,8 @@ class _DebugPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 200,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D0D18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0D18),
         border: Border(left: BorderSide(color: NezTheme.border)),
       ),
       padding: const EdgeInsets.all(12),
@@ -635,7 +635,7 @@ class _DebugPanel extends StatelessWidget {
         children: [
           _sectionTitle('CPU REGISTERS'),
           _regRow('PC', '\$${engine.cpuPc.toRadixString(16).padLeft(4, '0').toUpperCase()}'),
-          const Divider(color: NezTheme.border, height: 24),
+          Divider(color: NezTheme.border, height: 24),
           _sectionTitle('STATUS'),
           _regRow('Paused', engine.isPaused ? 'YES' : 'NO'),
           _regRow('FPS', '${engine.fps}'),
@@ -649,7 +649,7 @@ class _DebugPanel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.5,
@@ -715,7 +715,7 @@ class _MobileTopBar extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: onBack,
-            child: const Text('← Back', style: TextStyle(color: NezTheme.accentSecondary, fontSize: 13)),
+            child: Text('← Back', style: TextStyle(color: NezTheme.accentSecondary, fontSize: 13)),
           ),
           const Spacer(),
           Text(romName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -734,7 +734,7 @@ class _MobileTopBar extends StatelessWidget {
           if (onControllers != null) ...[
             GestureDetector(
               onTap: onControllers,
-              child: const Icon(Icons.qr_code, color: NezTheme.textSecondary, size: 18),
+              child: Icon(Icons.qr_code, color: NezTheme.textSecondary, size: 18),
             ),
             const SizedBox(width: 12),
           ],
@@ -767,7 +767,7 @@ class _MiniSysBtn extends StatelessWidget {
           color: NezTheme.bgSurface,
           border: Border.all(color: NezTheme.border),
         ),
-        child: Text(label, style: const TextStyle(color: NezTheme.textDim, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 1)),
+        child: Text(label, style: TextStyle(color: NezTheme.textDim, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 1)),
       ),
     );
   }
@@ -803,7 +803,7 @@ class _QrCard extends StatelessWidget {
         const SizedBox(height: 6),
         SelectableText(
           url,
-          style: const TextStyle(fontSize: 9, color: NezTheme.textDim, fontFamily: 'monospace'),
+          style: TextStyle(fontSize: 9, color: NezTheme.textDim, fontFamily: 'monospace'),
         ),
       ],
     );

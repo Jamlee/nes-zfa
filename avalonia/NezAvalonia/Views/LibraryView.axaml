@@ -5,30 +5,46 @@
              x:DataType="vm:LibraryViewModel">
 
     <DockPanel Margin="0">
-        <!-- Header -->
-        <DockPanel DockPanel.Dock="Top" Margin="28,24,28,0">
-            <TextBlock DockPanel.Dock="Left" Text="Library" FontSize="24" FontWeight="Bold"
-                       Foreground="#F0F0F5" VerticalAlignment="Center"/>
-            <Button DockPanel.Dock="Right" Name="AddRomBtn" Classes="primary"
-                    VerticalAlignment="Center">
+        <!-- Header - matches Flutter ShaderMask gradient title -->
+        <DockPanel DockPanel.Dock="Top" Margin="24,20,24,8">
+            <DockPanel DockPanel.Dock="Left">
+                <TextBlock Text="Nez" FontSize="26" FontWeight="800"
+                           Foreground="#FFFFFF">
+                    <TextBlock.OpacityMask>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                            <GradientStop Color="#6C5CE7" Offset="0"/>
+                            <GradientStop Color="#A29BFE" Offset="1"/>
+                        </LinearGradientBrush>
+                    </TextBlock.OpacityMask>
+                </TextBlock>
+            </DockPanel>
+            <Button DockPanel.Dock="Right" Name="AddRomBtn"
+                    VerticalAlignment="Center" CornerRadius="10"
+                    Padding="16,10"
+                    Background="#1E1E36"
+                    BorderBrush="#2D2D50"
+                    BorderThickness="1"
+                    Cursor="Hand">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="+" FontSize="18" FontWeight="Bold" Margin="0,-2,0,0"/>
-                    <TextBlock Text="Add ROM" FontSize="13" FontWeight="SemiBold"/>
+                    <PathIcon Data="M19 13h-6v-6h-2v6H5v2h6v6h2v-6h6z"
+                              Foreground="#A29BFE" Width="16" Height="16"
+                              VerticalAlignment="Center"/>
+                    <TextBlock Text="Add ROM" FontSize="13" FontWeight="SemiBold"
+                               Foreground="#C0C0D0" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Panel/>
         </DockPanel>
 
         <!-- Search -->
-        <Border DockPanel.Dock="Top" Margin="28,18,28,0"
-                Background="#12121A" CornerRadius="12"
-                BorderBrush="#2A2A44" BorderThickness="1"
-                Padding="4,0"
+        <Border DockPanel.Dock="Top" Margin="24,16,24,0"
+                Background="#12121A" CornerRadius="14"
+                BorderBrush="#1E1E36" BorderThickness="1"
+                Padding="12,0"
                 Name="SearchBorder">
             <Grid ColumnDefinitions="Auto,*">
-                <TextBlock Grid.Column="0" Text="&#x1F50D;" FontSize="14"
-                           Foreground="#555577" VerticalAlignment="Center"
-                           Margin="12,0,0,0" FontFamily="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji"/>
+                <PathIcon Grid.Column="0" Data="M15.5 14.79l-.32 0a5.4 5.4 0 01-7.58 7.58 5.4 5.4 0 01-.32-7.58 5.4 5.4 0 01.42-.32L15.5 14.79zM21 11h-2V6h2v5zm-4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5 2c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"
+                          Foreground="#555577" Width="18" Height="18"
+                          VerticalAlignment="Center" Margin="10,0,0,0"/>
                 <TextBox Grid.Column="1" Text="{Binding SearchQuery}"
                          Classes="search-input"
                          PlaceholderText="Search ROMs..."
@@ -61,11 +77,19 @@
                     <TextBlock Text="Add a .nes ROM file to get started" FontSize="13"
                                Foreground="#555577" HorizontalAlignment="Center"/>
                 </StackPanel>
-                <Button Name="AddRomEmptyBtn" Classes="primary"
-                        HorizontalAlignment="Center" Margin="0,4,0,0">
+                <Button Name="AddRomEmptyBtn"
+                        HorizontalAlignment="Center" Margin="0,4,0,0"
+                        CornerRadius="10" Padding="18,10"
+                        Background="#1E1E36"
+                        BorderBrush="#2D2D50"
+                        BorderThickness="1"
+                        Cursor="Hand">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="+" FontSize="18" FontWeight="Bold" Margin="0,-2,0,0"/>
-                        <TextBlock Text="Add ROM" FontSize="14" FontWeight="SemiBold"/>
+                        <PathIcon Data="M19 13h-6v-6h-2v6H5v2h6v6h2v-6h6z"
+                                  Foreground="#A29BFE" Width="16" Height="16"
+                                  VerticalAlignment="Center"/>
+                        <TextBlock Text="Add ROM" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="#C0C0D0"/>
                     </StackPanel>
                 </Button>
             </StackPanel>

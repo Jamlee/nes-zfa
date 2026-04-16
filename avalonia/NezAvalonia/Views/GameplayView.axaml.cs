@@ -8,7 +8,9 @@ using Avalonia.VisualTree;
 using NezAvalonia.Controls;
 using NezAvalonia.Core;
 using NezAvalonia.ViewModels;
+#if !BROWSER
 using QRCoder;
+#endif
 using System;
 using System.IO;
 
@@ -18,7 +20,6 @@ public partial class GameplayView : UserControl
 {
     private bool _displayInitialized;
     private bool _invalidatePending;
-    private GamepadServer? _gamepadServer;
     private bool _isLandscape;
 
     public GameplayView()
@@ -37,6 +38,13 @@ public partial class GameplayView : UserControl
 
         if (Vm == null) return;
 
+        // Wire engine to the global gamepad server
+#if !BROWSER
+        var main = FindMainView();
+        if (main?.DataContext is MainViewModel mvm && mvm.GamepadServerInstance != null)
+            mvm.GamepadServerInstance.SetEngine(Vm.Engine);
+#endif
+
         Vm.Engine.FrameReady += OnFrameReady;
 
         // Set landscape gamepad modes
@@ -52,10 +60,67 @@ public partial class GameplayView : UserControl
         WireSelStart(MobileSel, MobileStart);
         WireSelStart(LandscapeSel, LandscapeStart);
 
+        // Apply display settings
+        ApplyDisplaySettings();
+        ApplyControlSettings();
+
+        // Subscribe to settings changes for live updates
+        Vm.Settings.PropertyChanged += OnSettingsChanged;
+
         // Initial layout
         UpdateMobileLayout();
 
         Focus();
+    }
+
+    private void OnSettingsChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(Vm.Settings.AspectRatio):
+            case nameof(Vm.Settings.PixelFilter):
+            case nameof(Vm.Settings.ShowFps):
+                ApplyDisplaySettings();
+                break;
+            case nameof(Vm.Settings.ButtonSize):
+            case nameof(Vm.Settings.ButtonOpacity):
+                ApplyControlSettings();
+                break;
+        }
+    }
+
+    private void ApplyDisplaySettings()
+    {
+        if (Vm == null) return;
+        var settings = Vm.Settings;
+
+        // Apply to all display instances
+        Display?.SetShowFps(settings.ShowFps);
+        Display?.SetAspectRatio(settings.AspectRatio);
+        Display?.SetPixelFilter(settings.PixelFilter);
+
+        MobileDisplay?.SetShowFps(settings.ShowFps);
+        MobileDisplay?.SetAspectRatio(settings.AspectRatio);
+        MobileDisplay?.SetPixelFilter(settings.PixelFilter);
+
+        LandscapeDisplay?.SetShowFps(settings.ShowFps);
+        LandscapeDisplay?.SetAspectRatio(settings.AspectRatio);
+        LandscapeDisplay?.SetPixelFilter(settings.PixelFilter);
+    }
+
+    private void ApplyControlSettings()
+    {
+        if (Vm == null) return;
+        var settings = Vm.Settings;
+
+        MobileGamepad?.SetButtonSize(settings.ButtonSize);
+        MobileGamepad?.SetButtonOpacity(settings.ButtonOpacity);
+
+        LandscapeGamepad?.SetButtonSize(settings.ButtonSize);
+        LandscapeGamepad?.SetButtonOpacity(settings.ButtonOpacity);
+
+        LandscapeButtons?.SetButtonSize(settings.ButtonSize);
+        LandscapeButtons?.SetButtonOpacity(settings.ButtonOpacity);
     }
 
     private void WireGamepad(VirtualGamepad? gp)
@@ -108,40 +173,47 @@ public partial class GameplayView : UserControl
 
     private void OnFrameReady()
     {
-        if (Vm == null) return;
-
-        if (!_displayInitialized && Vm.Engine.FrameBitmap != null)
+        try
         {
-            Display?.SetBitmap(Vm.Engine.FrameBitmap);
-            MobileDisplay?.SetBitmap(Vm.Engine.FrameBitmap);
-            LandscapeDisplay?.SetBitmap(Vm.Engine.FrameBitmap);
-            _displayInitialized = true;
-        }
+            if (Vm == null) return;
 
-        Display?.SetFps(Vm.Engine.Fps);
-        MobileDisplay?.SetFps(Vm.Engine.Fps);
-        LandscapeDisplay?.SetFps(Vm.Engine.Fps);
-
-        if (!_invalidatePending)
-        {
-            _invalidatePending = true;
-            Dispatcher.UIThread.Post(() =>
+            if (!_displayInitialized && Vm.Engine.FrameBitmap != null)
             {
-                _invalidatePending = false;
-                Display?.InvalidateVisual();
-                MobileDisplay?.InvalidateVisual();
-                LandscapeDisplay?.InvalidateVisual();
+                Display?.SetBitmap(Vm.Engine.FrameBitmap);
+                MobileDisplay?.SetBitmap(Vm.Engine.FrameBitmap);
+                LandscapeDisplay?.SetBitmap(Vm.Engine.FrameBitmap);
+                _displayInitialized = true;
+            }
 
-                if (Vm?.ShowDebugPanel == true)
+            Display?.SetFps(Vm.Engine.Fps);
+            MobileDisplay?.SetFps(Vm.Engine.Fps);
+            LandscapeDisplay?.SetFps(Vm.Engine.Fps);
+
+            if (!_invalidatePending)
+            {
+                _invalidatePending = true;
+                Dispatcher.UIThread.Post(() =>
                 {
-                    if (DebugPC != null)
-                        DebugPC.Text = $"PC: ${Vm.Engine.CpuPc:X4}";
-                    if (DebugPaused != null)
-                        DebugPaused.Text = $"Paused: {(Vm.Engine.IsPaused ? "YES" : "NO")}";
-                    if (DebugFps != null)
-                        DebugFps.Text = $"FPS: {Vm.Engine.Fps}";
-                }
-            }, DispatcherPriority.Input);
+                    _invalidatePending = false;
+                    Display?.InvalidateVisual();
+                    MobileDisplay?.InvalidateVisual();
+                    LandscapeDisplay?.InvalidateVisual();
+
+                    if (Vm?.ShowDebugPanel == true)
+                    {
+                        if (DebugPC != null)
+                            DebugPC.Text = $"PC: ${Vm.Engine.CpuPc:X4}";
+                        if (DebugPaused != null)
+                            DebugPaused.Text = $"Paused: {(Vm.Engine.IsPaused ? "YES" : "NO")}";
+                        if (DebugFps != null)
+                            DebugFps.Text = $"FPS: {Vm.Engine.Fps}";
+                    }
+                }, DispatcherPriority.Input);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"NEZ OnFrameReady suppressed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -176,11 +248,10 @@ public partial class GameplayView : UserControl
     private void OnBack(object? sender, RoutedEventArgs e)
     {
         if (Vm != null)
+        {
             Vm.Engine.FrameReady -= OnFrameReady;
-
-        _gamepadServer?.Stop();
-        _gamepadServer?.Dispose();
-        _gamepadServer = null;
+            Vm.Settings.PropertyChanged -= OnSettingsChanged;
+        }
 
         FindMainView()?.ExitGameplay();
     }
@@ -227,20 +298,30 @@ public partial class GameplayView : UserControl
         Focus();
     }
 
+#if !BROWSER
     private void OnControllers(object? sender, RoutedEventArgs e)
     {
         if (Vm == null) return;
+        var main = FindMainView();
+        var mvm = main?.DataContext as MainViewModel;
+        if (mvm == null) return;
 
+        // Use the global gamepad server instance
         try
         {
-            if (_gamepadServer == null)
+            if (mvm.GamepadServerInstance == null)
             {
-                _gamepadServer = new GamepadServer(Vm.Engine);
-                _gamepadServer.Start();
+                mvm.GamepadServerInstance = new GamepadServer(Vm.Engine);
+                mvm.GamepadServerInstance.Start();
+            }
+            else
+            {
+                mvm.GamepadServerInstance.SetEngine(Vm.Engine);
             }
 
+            var gs = mvm.GamepadServerInstance;
             var ip = GamepadServer.GetLocalIp() ?? "0.0.0.0";
-            var port = _gamepadServer.Port;
+            var port = gs.Port;
             var urlP1 = $"http://{ip}:{port}/?player=1&mirror=true";
             var urlP2 = $"http://{ip}:{port}/?player=2&mirror=true";
 
@@ -280,4 +361,9 @@ public partial class GameplayView : UserControl
             return null;
         }
     }
+#else
+    // Browser stubs — GamepadServer is not available
+    private void OnControllers(object? sender, RoutedEventArgs e) { Focus(); }
+    private void OnCloseQrOverlay(object? sender, RoutedEventArgs e) { Focus(); }
+#endif
 }

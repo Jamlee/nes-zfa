@@ -13,34 +13,50 @@ info()  { echo -e "${CYAN}[INFO]${NC} $1"; }
 ok()    { echo -e "${GREEN}[OK]${NC} $1"; }
 fail()  { echo -e "${RED}[FAIL]${NC} $1"; exit 1; }
 
+# Generate app icons from docs/icon.svg (if script exists)
+generate_icons() {
+    if [ -f "$SCRIPT_DIR/scripts/generate_icons.sh" ]; then
+        info "Syncing icons from docs/icon.svg..."
+        bash "$SCRIPT_DIR/scripts/generate_icons.sh" 2>/dev/null || true
+    fi
+}
+
 usage() {
     cat <<'USAGE'
 Nez — NES Emulator
 
-Usage: ./build.sh <command> [--release] [--no-rom]
+Usage: ./build.sh <command> [--release]
 
-  flutter             Build lib + run Flutter macOS app
-  avalonia            Build lib + run Avalonia macOS app
-  android             Build lib + run Flutter on Android
-  android-avalonia    Build lib + run Avalonia on Android
-  apk                 Build Flutter Android APK → out/
-  apk-avalonia        Build Avalonia Android APK → out/
-  dmg                 Build Flutter macOS DMG → out/
-  dmg-avalonia        Build Avalonia macOS DMG → out/
-  exe                 Build Flutter Windows EXE (requires Windows)
-  exe-avalonia        Cross-compile Avalonia Windows EXE → out/
-  all                 Build all: apk + apk-avalonia + dmg + dmg-avalonia + exe-avalonia → out/
-  lib                 Build Zig shared library only
-  clean               Clean all build artifacts
-  check               Check toolchain versions
+  Platform targets (run / dev):
+    macos               Build lib + run Flutter macOS app
+    macos-avalonia      Build lib + run Avalonia macOS app
+    android             Build lib + run Flutter on Android
+    android-avalonia    Build lib + run Avalonia on Android
+    web                 Build wasm + serve Flutter web (dev)
+    web-avalonia        Build wasm + serve Avalonia Browser (dev)
+
+  Release builds → out/:
+    apk                 Flutter Android APK
+    apk-avalonia        Avalonia Android APK
+    dmg                 Flutter macOS DMG
+    dmg-avalonia        Avalonia macOS DMG
+    web-flutter         Flutter web release (zip)
+    web-avalonia        Avalonia Browser release (zip)
+    exe-avalonia        Avalonia Windows ZIP (cross-compile)
+
+  Utilities:
+    wasm                Build Zig → nez_emu.wasm only
+    lib                 Build Zig shared library only
+    all                 Build all: apk + apk-avalonia + dmg + dmg-avalonia + exe-avalonia
+    clean               Clean all build artifacts
+    check               Check toolchain versions
 
 Examples:
-  ./build.sh flutter
-  ./build.sh avalonia
+  ./build.sh macos
+  ./build.sh web
   ./build.sh apk --release
-  ./build.sh apk --release --no-rom
   ./build.sh apk-avalonia --release
-  ./build.sh exe
+  ./build.sh exe-avalonia
 USAGE
 }
 
@@ -54,6 +70,40 @@ build_lib() {
     cd "$LIB_DIR"
     zig build lib -Doptimize=ReleaseFast
     ok "libnez_emu.dylib ($(du -h "$ZIG_OUT"/libnez_emu.* 2>/dev/null | head -1 | awk '{print $1}'))"
+}
+
+build_wasm() {
+    info "Building nez_emu.wasm..."
+    cd "$LIB_DIR"
+    zig build wasm -Doptimize=ReleaseSmall
+    ok "nez_emu.wasm ($(du -h "$LIB_DIR"/zig-out/bin/nez_emu.wasm 2>/dev/null | awk '{print $1}'))"
+}
+
+copy_wasm_flutter() {
+    local wasm="$LIB_DIR/zig-out/bin/nez_emu.wasm"
+    [ -f "$wasm" ] || fail "nez_emu.wasm not found"
+    mkdir -p "$FLUTTER_DIR/web"
+    cp -f "$wasm" "$FLUTTER_DIR/web/nez_emu.wasm"
+    ok "Copied .wasm → Flutter web/"
+}
+
+copy_wasm_avalonia() {
+    local wasm="$LIB_DIR/zig-out/bin/nez_emu.wasm"
+    [ -f "$wasm" ] || fail "nez_emu.wasm not found"
+    mkdir -p "$AVALONIA_DIR/NezAvalonia.Browser/wwwroot"
+    cp -f "$wasm" "$AVALONIA_DIR/NezAvalonia.Browser/wwwroot/nez_emu.wasm"
+    ok "Copied .wasm → Avalonia Browser wwwroot/"
+}
+
+# Copy ROMs into target roms dir (for Flutter assets / Avalonia embedded resources)
+copy_roms() {
+    local dest="$1"
+    mkdir -p "$dest"
+    local src="$SCRIPT_DIR/roms"
+    if [ -d "$src" ] && [ "$(ls -A "$src" 2>/dev/null)" ]; then
+        cp -f "$src/"*.nes "$dest/" 2>/dev/null || true
+        ok "Copied ROMs → $dest/"
+    fi
 }
 
 copy_dylib_flutter() {
@@ -120,7 +170,7 @@ copy_so_avalonia() {
 
 cmd_flutter() {
     check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
-    build_lib
+    build_lib; copy_roms "$FLUTTER_DIR/roms"
     info "Running Flutter macOS..."
     cd "$FLUTTER_DIR" && flutter pub get
     flutter build macos --debug
@@ -137,7 +187,7 @@ cmd_avalonia() {
 
 cmd_android() {
     check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
-    build_android_so; copy_so_flutter
+    build_android_so; copy_so_flutter; copy_roms "$FLUTTER_DIR/roms"
     cd "$FLUTTER_DIR" && flutter pub get && flutter run -d android
 }
 
@@ -148,16 +198,57 @@ cmd_android_avalonia() {
     cd "$AVALONIA_DIR" && dotnet run -f net10.0-android
 }
 
+cmd_flutter_web() {
+    check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
+    build_wasm; copy_wasm_flutter; copy_roms "$FLUTTER_DIR/roms"
+    info "Serving Flutter web..."
+    cd "$FLUTTER_DIR" && flutter pub get && flutter run -d chrome
+}
+
+cmd_avalonia_web() {
+    check_tools; command -v dotnet >/dev/null 2>&1 || fail "dotnet not found"
+    build_wasm; copy_wasm_avalonia
+    info "Building Avalonia Browser (WASM)..."
+    cd "$AVALONIA_DIR/NezAvalonia.Browser"
+    dotnet publish -f net10.0-browser -c Debug
+    local pub_dir="$AVALONIA_DIR/NezAvalonia.Browser/bin/Debug/net10.0-browser/osx-arm64/publish/wwwroot"
+    local pub_root="$AVALONIA_DIR/NezAvalonia.Browser/bin/Debug/net10.0-browser/osx-arm64/publish"
+    [ -d "$pub_root" ] || fail "Avalonia Browser publish dir not found"
+
+    mkdir -p "$OUT_DIR"
+    if command -v zip >/dev/null 2>&1; then
+        info "Packaging ZIP..."
+        local tmp_dir="$OUT_DIR/nez-web-avalonia"
+        rm -rf "$tmp_dir"
+        mkdir -p "$tmp_dir"
+        cp -R "$pub_root/"* "$tmp_dir/"
+        (cd "$OUT_DIR" && zip -r -q "nez-web-avalonia.zip" "nez-web-avalonia" && rm -rf "nez-web-avalonia")
+        [ -f "$OUT_DIR/nez-web-avalonia.zip" ] && ok "ZIP: $OUT_DIR/nez-web-avalonia.zip ($(du -h "$OUT_DIR/nez-web-avalonia.zip" | awk '{print $1}'))"
+        info "Serve with: cd '$OUT_DIR' && python3 -m http.server 8080 && open http://localhost:8080"
+    else
+        local dest="$OUT_DIR/nez-web-avalonia"
+        rm -rf "$dest"
+        mkdir -p "$dest"
+        cp -R "$pub_root/"* "$dest/"
+        ok "Avalonia web: $dest/"
+    fi
+}
+
+cmd_wasm() {
+    check_tools; build_wasm
+    info "WASM output: $ZIG_OUT/libnez_emu.wasm"
+}
+
 cmd_apk() {
     local mode="${1:-debug}"
     check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
-    build_android_so; copy_so_flutter
+    build_android_so; copy_so_flutter; copy_roms "$FLUTTER_DIR/roms"
     info "Building Flutter APK ($mode)..."
     cd "$FLUTTER_DIR" && flutter pub get && flutter build apk --"$mode"
     local apk="$FLUTTER_DIR/build/app/outputs/flutter-apk/app-$mode.apk"
     mkdir -p "$OUT_DIR"
-    cp -f "$apk" "$OUT_DIR/nez-flutter-$mode.apk"
-    ok "Flutter APK: $OUT_DIR/nez-flutter-$mode.apk ($(du -h "$apk" | awk '{print $1}'))"
+    cp -f "$apk" "$OUT_DIR/nez-android-flutter.apk"
+    ok "Flutter APK: $OUT_DIR/nez-android-flutter.apk ($(du -h "$apk" | awk '{print $1}'))"
 }
 
 cmd_apk_avalonia() {
@@ -175,8 +266,8 @@ cmd_apk_avalonia() {
     fi
     if [ -f "$apk" ]; then
         mkdir -p "$OUT_DIR"
-        cp -f "$apk" "$OUT_DIR/nez-avalonia-$mode.apk"
-        ok "Avalonia APK: $OUT_DIR/nez-avalonia-$mode.apk ($(du -h "$apk" | awk '{print $1}'))"
+        cp -f "$apk" "$OUT_DIR/nez-android-avalonia.apk"
+        ok "Avalonia APK: $OUT_DIR/nez-android-avalonia.apk ($(du -h "$apk" | awk '{print $1}'))"
     else
         fail "APK not found"
     fi
@@ -196,7 +287,7 @@ cmd_clean() {
 cmd_dmg() {
     local mode="${1:-release}"
     check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
-    build_lib
+    build_lib; copy_roms "$FLUTTER_DIR/roms"
     info "Building Flutter macOS app ($mode)..."
     cd "$FLUTTER_DIR" && flutter pub get
     flutter build macos --"$mode"
@@ -212,18 +303,18 @@ cmd_dmg() {
     [ -z "$app" ] && fail "macOS .app not found"
 
     mkdir -p "$OUT_DIR"
-    local dest="$OUT_DIR/Nez.app"
+    local dest="$OUT_DIR/nez-macos-flutter.app"
     rm -rf "$dest"
     cp -R "$app" "$dest"
     # Copy dylib into the app bundle
     local dylib="$ZIG_OUT/libnez_emu.dylib"
     [ -f "$dylib" ] && cp -f "$dylib" "$dest/Contents/MacOS/" && codesign --force --sign - "$dest/Contents/MacOS/libnez_emu.dylib" 2>/dev/null || true
-    ok "macOS app: $OUT_DIR/Nez.app"
+    ok "macOS app: $OUT_DIR/nez-macos-flutter.app"
 
     # Create DMG if hdiutil available
     if command -v hdiutil >/dev/null 2>&1; then
         info "Creating DMG..."
-        local dmg="$OUT_DIR/Nez.dmg"
+        local dmg="$OUT_DIR/nez-macos-flutter.dmg"
         rm -f "$dmg"
         hdiutil create -volname "Nez" -srcfolder "$dest" -ov -format UDZO "$dmg" 2>/dev/null
         [ -f "$dmg" ] && ok "DMG: $dmg ($(du -h "$dmg" | awk '{print $1}'))"
@@ -245,8 +336,8 @@ cmd_publish_avalonia() {
     [ -d "$pub_dir" ] || fail "Publish dir not found: $pub_dir"
 
     # Build .app bundle
-    local app_dir="$OUT_DIR/Nez-Avalonia.app/Contents"
-    rm -rf "$OUT_DIR/Nez-Avalonia.app"
+    local app_dir="$OUT_DIR/nez-macos-avalonia.app/Contents"
+    rm -rf "$OUT_DIR/nez-macos-avalonia.app"
     mkdir -p "$app_dir/MacOS" "$app_dir/Resources"
     cp -R "$pub_dir/"* "$app_dir/MacOS/"
     local dylib="$ZIG_OUT/libnez_emu.dylib"
@@ -264,19 +355,23 @@ cmd_publish_avalonia() {
     <key>CFBundleVersion</key><string>1.0</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleExecutable</key><string>NezAvalonia</string>
+    <key>CFBundleIconFile</key><string>nez</string>
     <key>LSMinimumSystemVersion</key><string>12.0</string>
     <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>
 PLIST
-    ok "Avalonia app: $OUT_DIR/Nez-Avalonia.app"
+    # Copy app icon
+    local icon="$AVALONIA_DIR/Assets/nez.icns"
+    [ -f "$icon" ] && cp -f "$icon" "$app_dir/Resources/nez.icns"
+    ok "Avalonia app: $OUT_DIR/nez-macos-avalonia.app"
 
     # Create DMG
     if command -v hdiutil >/dev/null 2>&1; then
         info "Creating DMG..."
-        local dmg="$OUT_DIR/Nez-Avalonia.dmg"
+        local dmg="$OUT_DIR/nez-macos-avalonia.dmg"
         rm -f "$dmg"
-        hdiutil create -volname "Nez-Avalonia" -srcfolder "$OUT_DIR/Nez-Avalonia.app" -ov -format UDZO "$dmg" 2>/dev/null
+        hdiutil create -volname "Nez-Avalonia" -srcfolder "$OUT_DIR/nez-macos-avalonia.app" -ov -format UDZO "$dmg" 2>/dev/null
         [ -f "$dmg" ] && ok "DMG: $dmg ($(du -h "$dmg" | awk '{print $1}'))"
     fi
 }
@@ -289,11 +384,11 @@ cmd_exe() {
     flutter build windows --release
     local exe_dir="$FLUTTER_DIR/build/windows/x64/runner/Release"
     [ -d "$exe_dir" ] || fail "Flutter Windows build dir not found. This command must run on Windows."
-    mkdir -p "$OUT_DIR/nez-flutter-windows"
-    cp -R "$exe_dir/"* "$OUT_DIR/nez-flutter-windows/"
+    mkdir -p "$OUT_DIR/nez-windows-flutter"
+    cp -R "$exe_dir/"* "$OUT_DIR/nez-windows-flutter/"
     local dylib="$ZIG_OUT/nez_emu.dll"
-    [ -f "$dylib" ] && cp -f "$dylib" "$OUT_DIR/nez-flutter-windows/"
-    ok "Flutter Windows EXE: $OUT_DIR/nez-flutter-windows/"
+    [ -f "$dylib" ] && cp -f "$dylib" "$OUT_DIR/nez-windows-flutter/"
+    ok "Flutter Windows EXE: $OUT_DIR/nez-windows-flutter/"
 }
 
 cmd_exe_avalonia() {
@@ -314,62 +409,95 @@ cmd_exe_avalonia() {
     local pub_dir="$AVALONIA_DIR/bin/Release/net10.0/win-x64/publish"
     [ -d "$pub_dir" ] || fail "Publish dir not found: $pub_dir"
 
-    local dest="$OUT_DIR/nez-windows"
+    local dest="$OUT_DIR/nez-windows-avalonia"
     rm -rf "$dest"
     mkdir -p "$dest"
     cp -R "$pub_dir/"* "$dest/"
     cp -f "$LIB_DIR/nez_emu.dll" "$dest/"
     ok "Windows EXE: $dest/"
 
+    # Package as zip
+    if command -v zip >/dev/null 2>&1; then
+        info "Packaging ZIP..."
+        (cd "$OUT_DIR" && zip -r -q "nez-windows-avalonia.zip" "nez-windows-avalonia" && rm -rf "nez-windows-avalonia")
+        [ -f "$OUT_DIR/nez-windows-avalonia.zip" ] && ok "ZIP: $OUT_DIR/nez-windows-avalonia.zip ($(du -h "$OUT_DIR/nez-windows-avalonia.zip" | awk '{print $1}'))"
+    fi
+
     # Clean up cross-compile artifacts
     rm -f "$LIB_DIR/nez_emu.dll" "$LIB_DIR/nez_emu.dll.o" "$LIB_DIR/nez_emu.lib" "$LIB_DIR/nez_emu.pdb"
 }
 
-# ---- ROM exclusion ----
-NO_ROM=false
-ROM_TMP=""
+cmd_web_flutter() {
+    check_tools; command -v flutter >/dev/null 2>&1 || fail "flutter not found"
+    build_wasm; copy_wasm_flutter; copy_roms "$FLUTTER_DIR/roms"
+    info "Building Flutter web release..."
+    cd "$FLUTTER_DIR" && flutter pub get && flutter build web --release
+    local web_dir="$FLUTTER_DIR/build/web"
+    [ -d "$web_dir" ] || fail "Flutter web build dir not found"
 
-exclude_roms() {
-    local rom_dir="$FLUTTER_DIR/roms"
-    ROM_TMP=$(mktemp -d)
-    local count=0
-    for f in "$rom_dir"/*.nes "$rom_dir"/*.NES; do
-        [ -f "$f" ] || continue
-        mv "$f" "$ROM_TMP/"
-        count=$((count + 1))
-    done
-    [ "$count" -gt 0 ] && info "Excluded $count ROM(s) from build → $ROM_TMP"
-}
-
-restore_roms() {
-    if [ -n "$ROM_TMP" ] && [ -d "$ROM_TMP" ]; then
-        local rom_dir="$FLUTTER_DIR/roms"
-        for f in "$ROM_TMP"/*.nes "$ROM_TMP"/*.NES; do
-            [ -f "$f" ] || continue
-            mv "$f" "$rom_dir/"
-        done
-        rmdir "$ROM_TMP" 2>/dev/null
-        ROM_TMP=""
-        info "ROMs restored"
+    mkdir -p "$OUT_DIR"
+    if command -v zip >/dev/null 2>&1; then
+        info "Packaging ZIP..."
+        local tmp_dir="$OUT_DIR/nez-web-flutter"
+        rm -rf "$tmp_dir"
+        cp -R "$web_dir" "$tmp_dir"
+        (cd "$OUT_DIR" && zip -r -q "nez-web-flutter.zip" "nez-web-flutter" && rm -rf "nez-web-flutter")
+        [ -f "$OUT_DIR/nez-web-flutter.zip" ] && ok "ZIP: $OUT_DIR/nez-web-flutter.zip ($(du -h "$OUT_DIR/nez-web-flutter.zip" | awk '{print $1}'))"
+    else
+        local dest="$OUT_DIR/nez-web-flutter"
+        rm -rf "$dest"
+        cp -R "$web_dir" "$dest"
+        ok "Flutter web: $dest/"
     fi
 }
 
-# Ensure ROMs are restored on exit
-trap restore_roms EXIT
+cmd_web_avalonia() {
+    check_tools; command -v dotnet >/dev/null 2>&1 || fail "dotnet not found"
+    build_wasm; copy_wasm_avalonia
+    info "Publishing Avalonia Browser (WASM)..."
+    cd "$AVALONIA_DIR/NezAvalonia.Browser"
+    dotnet publish -c Release
+    local pub_dir="$AVALONIA_DIR/NezAvalonia.Browser/bin/Release/net10.0-browser/osx-arm64/publish/wwwroot"
+    [ -d "$pub_dir" ] || fail "Avalonia Browser publish dir not found"
+
+    # Include the index.html and framework files
+    local pub_root="$AVALONIA_DIR/NezAvalonia.Browser/bin/Release/net10.0-browser/osx-arm64/publish"
+    [ -d "$pub_root" ] || fail "Avalonia Browser publish root not found"
+
+    mkdir -p "$OUT_DIR"
+    if command -v zip >/dev/null 2>&1; then
+        info "Packaging ZIP..."
+        local tmp_dir="$OUT_DIR/nez-web-avalonia"
+        rm -rf "$tmp_dir"
+        mkdir -p "$tmp_dir"
+        cp -R "$pub_root/"* "$tmp_dir/"
+        (cd "$OUT_DIR" && zip -r -q "nez-web-avalonia.zip" "nez-web-avalonia" && rm -rf "nez-web-avalonia")
+        [ -f "$OUT_DIR/nez-web-avalonia.zip" ] && ok "ZIP: $OUT_DIR/nez-web-avalonia.zip ($(du -h "$OUT_DIR/nez-web-avalonia.zip" | awk '{print $1}'))"
+    else
+        local dest="$OUT_DIR/nez-web-avalonia"
+        rm -rf "$dest"
+        cp -R "$pub_root/"* "$dest/"
+        ok "Avalonia web: $dest/"
+    fi
+}
 
 # ---- Main ----
-RELEASE=false; NO_ROM=false; CMD=""
+RELEASE=false; CMD=""
 for arg in "$@"; do
-    case "$arg" in --release) RELEASE=true ;; --no-rom) NO_ROM=true ;; -h|--help) usage; exit 0 ;; *) CMD="$arg" ;; esac
+    case "$arg" in --release) RELEASE=true ;; -h|--help) usage; exit 0 ;; *) CMD="$arg" ;; esac
 done
 MODE="debug"; $RELEASE && MODE="release"
-$NO_ROM && exclude_roms
 
-case "${CMD:-flutter}" in
-    flutter)           cmd_flutter ;;
-    avalonia)          cmd_avalonia ;;
+case "${CMD:-macos}" in
+    macos)             cmd_flutter ;;
+    macos-avalonia)    cmd_avalonia ;;
     android)           cmd_android ;;
     android-avalonia)  cmd_android_avalonia ;;
+    web)               cmd_flutter_web ;;
+    web-avalonia)      cmd_avalonia_web ;;
+    web-flutter)       cmd_web_flutter ;;
+    web-avalonia)      cmd_web_avalonia ;;
+    wasm)              cmd_wasm ;;
     apk)               cmd_apk "$MODE" ;;
     apk-avalonia)      cmd_apk_avalonia "$MODE" ;;
     dmg)               cmd_dmg "$MODE" ;;
@@ -378,6 +506,7 @@ case "${CMD:-flutter}" in
     exe-avalonia)      cmd_exe_avalonia ;;
     all)
         info "Building ALL targets → out/"
+        generate_icons
         cmd_apk "$MODE"
         cmd_apk_avalonia "$MODE"
         cmd_dmg "$MODE"

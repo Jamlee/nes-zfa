@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -26,6 +27,12 @@ public partial class RecordingsViewModel : ObservableObject
     }
 
     public ObservableCollection<RecordingEntry> Recordings { get; } = new();
+
+    [ObservableProperty]
+    private RecordingEntry? _selectedRecording;
+
+    [ObservableProperty]
+    private bool _isPreviewOpen;
 
     public RecordingsViewModel()
     {
@@ -62,6 +69,11 @@ public partial class RecordingsViewModel : ObservableObject
         {
             File.Delete(entry.FilePath);
             Recordings.Remove(entry);
+            if (SelectedRecording == entry)
+            {
+                SelectedRecording = null;
+                IsPreviewOpen = false;
+            }
         }
         catch
         {
@@ -108,6 +120,19 @@ public partial class RecordingsViewModel : ObservableObject
             // Ignore
         }
     }
+
+    [RelayCommand]
+    private void Preview(RecordingEntry entry)
+    {
+        SelectedRecording = entry;
+        IsPreviewOpen = true;
+    }
+
+    [RelayCommand]
+    private void ClosePreview()
+    {
+        IsPreviewOpen = false;
+    }
 }
 
 public class RecordingEntry : ObservableObject
@@ -116,6 +141,35 @@ public class RecordingEntry : ObservableObject
     public string FileName { get; set; } = string.Empty;
     public DateTime Date { get; set; }
     public long SizeBytes { get; set; }
+
+    /// <summary>
+    /// Game name extracted from the file name.
+    /// File naming convention: nez_{gameName}_{timestamp}.gif
+    /// Falls back to file name if pattern doesn't match (old format: nez_{timestamp}.gif).
+    /// </summary>
+    public string GameName
+    {
+        get
+        {
+            var name = Path.GetFileNameWithoutExtension(FileName);
+            if (name.StartsWith("nez_"))
+            {
+                var rest = name.Substring(4);
+                int lastUnderscore = rest.LastIndexOf('_');
+                if (lastUnderscore > 0)
+                {
+                    var afterUnderscore = rest.Substring(lastUnderscore + 1);
+                    if (afterUnderscore.Length >= 13 && long.TryParse(afterUnderscore, out _))
+                    {
+                        var gamePart = rest.Substring(0, lastUnderscore);
+                        if (!string.IsNullOrEmpty(gamePart))
+                            return gamePart.Replace('_', ' ');
+                    }
+                }
+            }
+            return Path.GetFileNameWithoutExtension(FileName);
+        }
+    }
 
     public string SizeText
     {
@@ -128,4 +182,20 @@ public class RecordingEntry : ObservableObject
     }
 
     public string DateText => Date.ToString("yyyy-MM-dd HH:mm");
+
+    private Bitmap? _thumbnail;
+    public Bitmap? Thumbnail
+    {
+        get
+        {
+            if (_thumbnail != null) return _thumbnail;
+            try
+            {
+                if (File.Exists(FilePath))
+                    _thumbnail = new Bitmap(FilePath);
+            }
+            catch { }
+            return _thumbnail;
+        }
+    }
 }

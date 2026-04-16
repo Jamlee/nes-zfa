@@ -2,12 +2,30 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
-    android:viewportWidth="48"
-    android:viewportHeight="48">
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <!-- Background -->
     <path
-        android:fillColor="#6C5CE7"
-        android:pathData="M8,8h32v32h-32z"/>
+        android:fillColor="#f8fafc"
+        android:pathData="M180,0L844,0A180,180,0,0,1,1024,180L1024,844A180,180,0,0,1,844,1024L180,1024A180,180,0,0,1,0,844L0,180A180,180,0,0,1,180,0z"/>
+    <!-- Controller body -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M18,18l12,6l-12,6z"/>
+        android:fillColor="#e2e8f0"
+        android:pathData="M272,220 C280,230 392,210 520,210 C648,210 760,230 752,260 L780,300 C812,335 812,385 807,425 L802,640 C799,725 750,765 687,805 L637,838 C590,870 547,828 500,762 L460,710 C432,672 392,672 364,710 L324,762 C277,828 234,870 187,838 L137,805 C74,765 64,698 130,640 L125,425 C120,385 120,335 160,300 Z"/>
+    <!-- D-Pad vertical -->
+    <path
+        android:fillColor="#cbd5e1"
+        android:pathData="M272,238 L304,238 C308,238 312,242 312,246 L312,330 C312,334 308,338 304,338 L272,338 C268,338 264,334 264,330 L264,246 C264,242 268,238 272,238 Z"/>
+    <!-- D-Pad horizontal -->
+    <path
+        android:fillColor="#cbd5e1"
+        android:pathData="M248,274 L328,274 C332,274 336,278 336,282 L336,298 C336,302 332,306 328,306 L248,306 C244,306 240,302 240,298 L240,282 C240,278 244,274 248,274 Z"/>
+    <!-- A Button -->
+    <path
+        android:fillColor="#fca5a5"
+        android:pathData="M660,299 A37,37,0,1,1,660,373 A37,37,0,1,1,660,299 Z"/>
+    <!-- B Button -->
+    <path
+        android:fillColor="#fca5a5"
+        android:pathData="M588,329 A37,37,0,1,1,588,403 A37,37,0,1,1,588,329 Z"/>
 </vector>

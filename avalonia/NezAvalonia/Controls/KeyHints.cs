@@ -4,7 +4,6 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using NezAvalonia.Core;
 using System;
-using System.Linq;
 
 namespace NezAvalonia.Controls;
 

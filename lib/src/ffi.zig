@@ -2,6 +2,7 @@
 //! 
 //! Exports C-ABI compatible functions for calling the Nez NES emulator
 //! from Dart via Foreign Function Interface (FFI).
+//! For WASM target, see ffi_wasm.zig which avoids filesystem dependencies.
 
 const std = @import("std");
 const nes = @import("nes.zig");

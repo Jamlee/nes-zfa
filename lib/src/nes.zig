@@ -53,7 +53,42 @@ pub const Console = struct {
         gamepad2.* = Gamepad{};
 
         var mainBus = try allocator.create(NESBus);
-        mainBus.* = try NESBus.init(allocator, cart, apu, ppu, gamepad, gamepad2);
+        mainBus.* = try NESBus.init(allocator, cart, apu, ppu, cpu, gamepad, gamepad2);
+
+        cpu.* = CPU.init(allocator, &mainBus.bus);
+        apu.* = try APU.init(allocator, cpu);
+        ppu.* = PPU.init(cpu, mainBus.mapper);
+
+        return .{
+            .allocator = allocator,
+            .cart = cart,
+            .cpu = cpu,
+            .ppu = ppu,
+            .apu = apu,
+            .mainBus = mainBus,
+            .controller = gamepad,
+            .controller2 = gamepad2,
+            .audio_sample_queue = try Queue(i16).init(allocator),
+        };
+    }
+
+    /// Initialize an NES console from ROM data in memory (for WASM / web).
+    pub fn fromROMData(allocator: Allocator, rom_data: []const u8) !Self {
+        const cart = try allocator.create(Cart);
+        cart.* = try Cart.loadFromMemory(allocator, rom_data);
+
+        const cpu = try allocator.create(CPU);
+        const apu = try allocator.create(APU);
+        const ppu = try allocator.create(PPU);
+
+        const gamepad = try allocator.create(Gamepad);
+        gamepad.* = Gamepad{};
+
+        const gamepad2 = try allocator.create(Gamepad);
+        gamepad2.* = Gamepad{};
+
+        var mainBus = try allocator.create(NESBus);
+        mainBus.* = try NESBus.init(allocator, cart, apu, ppu, cpu, gamepad, gamepad2);
 
         cpu.* = CPU.init(allocator, &mainBus.bus);
         apu.* = try APU.init(allocator, cpu);
@@ -94,6 +129,7 @@ pub const Console = struct {
     pub inline fn tick(self: *Self) !void {
         try self.cpu.tick();
         self.apu.tickByCpuClock();
+        self.mainBus.mapper.step();
 
         self.apu_sample_clock += 44100;
         if (self.apu_sample_clock >= 1789773) {
@@ -109,7 +145,7 @@ pub const Console = struct {
 
     // Update the console state.
     // `dt`: time elapsed since last call to update in ms.
-    // Retrurns the number of CPU cycles executed.
+    // Returns the number of CPU cycles executed.
     pub fn update(self: *Self, dt: u64) !u64 {
         if (self.is_paused) return 0;
         const cpu_cycles: u64 = @intFromFloat(
@@ -117,7 +153,9 @@ pub const Console = struct {
         );
         if (cpu_cycles < 1) return 0;
 
-        for (0..@as(usize, cpu_cycles)) |_| {
+        // Clamp to reasonable max to avoid overflow on 32-bit platforms (wasm32)
+        const cycles_to_run: usize = @intCast(@min(cpu_cycles, @as(u64, 1_000_000)));
+        for (0..cycles_to_run) |_| {
             try self.tick();
         }
 

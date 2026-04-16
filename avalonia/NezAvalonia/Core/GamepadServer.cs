@@ -2,8 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -12,30 +10,50 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace NezAvalonia.Core;
 
 /// <summary>
 /// HTTP + WebSocket server that serves the web gamepad HTML page,
-/// an MJPEG video stream, and receives controller input via WebSocket.
+/// and receives controller input via WebSocket.
+/// Mirror mode uses the incremental delta protocol over WebSocket.
 /// </summary>
 public sealed class GamepadServer : IDisposable
 {
-    private readonly NezEngine _engine;
+    private INezEngine? _engine;
+    private DeltaEncoder _deltaEncoder;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _listenerTask;
     private readonly ConcurrentBag<WebSocket> _sockets = new();
 
+    // Track which sockets want mirror (delta) frames
+    private readonly ConcurrentDictionary<WebSocket, bool> _mirrorClients = new();
+
     public int Port { get; private set; } = 8080;
     public bool IsRunning => _listener?.IsListening == true;
+    public INezEngine? Engine => _engine;
 
-    public GamepadServer(NezEngine engine)
+    /// Create without an engine — engine will be set when gameplay starts.
+    public GamepadServer() : this(null!) { }
+
+    public GamepadServer(INezEngine engine)
     {
         _engine = engine;
+        if (_engine != null) {
+            _deltaEncoder = new DeltaEncoder(_engine.ScreenWidth, _engine.ScreenHeight, blockSize: 8);
+        } else {
+            // Placeholder: will be re-initialized when engine is set
+            _deltaEncoder = new DeltaEncoder(256, 240, blockSize: 8);
+        }
+    }
+
+    /// Update the active game engine (called when entering/exiting gameplay).
+    public void SetEngine(INezEngine? engine)
+    {
+        _engine = engine;
+        if (_engine != null)
+            _deltaEncoder = new DeltaEncoder(_engine.ScreenWidth, _engine.ScreenHeight, blockSize: 8);
     }
 
     /// <summary>
@@ -146,6 +164,7 @@ public sealed class GamepadServer : IDisposable
     public void Stop()
     {
         _cts?.Cancel();
+        _deltaCts?.Cancel();
         try { _listener?.Stop(); } catch { /* ignore */ }
         _listener?.Close();
         _listener = null;
@@ -163,6 +182,7 @@ public sealed class GamepadServer : IDisposable
             ws.Dispose();
         }
         _sockets.Clear();
+        _mirrorClients.Clear();
     }
 
     private async Task AcceptLoop(CancellationToken ct)
@@ -197,9 +217,6 @@ public sealed class GamepadServer : IDisposable
                 case "/":
                     ServeHtml(ctx);
                     break;
-                case "/stream":
-                    await ServeMjpeg(ctx, ct);
-                    break;
                 default:
                     ctx.Response.StatusCode = 404;
                     ctx.Response.Close();
@@ -221,57 +238,6 @@ public sealed class GamepadServer : IDisposable
         ctx.Response.Close();
     }
 
-    private async Task ServeMjpeg(HttpListenerContext ctx, CancellationToken ct)
-    {
-        const string boundary = "--nezframe";
-        ctx.Response.ContentType = $"multipart/x-mixed-replace; boundary={boundary}";
-        ctx.Response.Headers.Add("Cache-Control", "no-cache");
-        ctx.Response.Headers.Add("Connection", "keep-alive");
-
-        var stream = ctx.Response.OutputStream;
-        var encoder = new JpegEncoder { Quality = 50 };
-        int w = _engine.ScreenWidth;
-        int h = _engine.ScreenHeight;
-
-        var sw = Stopwatch.StartNew();
-        double nextFrame = 0;
-        const double frameInterval = 1000.0 / 20.0; // 20 fps
-
-        try
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                double now = sw.Elapsed.TotalMilliseconds;
-                if (now < nextFrame)
-                {
-                    await Task.Delay(Math.Max(1, (int)(nextFrame - now)), ct);
-                }
-                nextFrame = Math.Max(nextFrame + frameInterval, sw.Elapsed.TotalMilliseconds);
-
-                var buffer = _engine.GetBackBuffer();
-                if (buffer == null) continue;
-
-                using var image = Image.LoadPixelData<Bgra32>(buffer, w, h);
-                using var ms = new MemoryStream();
-                image.Save(ms, encoder);
-                var jpeg = ms.ToArray();
-
-                var header = Encoding.ASCII.GetBytes(
-                    $"\r\n{boundary}\r\nContent-Type: image/jpeg\r\nContent-Length: {jpeg.Length}\r\n\r\n");
-
-                await stream.WriteAsync(header, 0, header.Length, ct);
-                await stream.WriteAsync(jpeg, 0, jpeg.Length, ct);
-                await stream.FlushAsync(ct);
-            }
-        }
-        catch (OperationCanceledException) { }
-        catch { /* client disconnected */ }
-        finally
-        {
-            try { ctx.Response.Close(); } catch { /* ignore */ }
-        }
-    }
-
     private async Task HandleWebSocket(HttpListenerContext ctx, CancellationToken ct)
     {
         WebSocketContext wsCtx;
@@ -289,6 +255,9 @@ public sealed class GamepadServer : IDisposable
         var ws = wsCtx.WebSocket;
         _sockets.Add(ws);
 
+        // Start delta broadcast if this is the first mirror client
+        EnsureDeltaBroadcast(ct);
+
         var buf = new byte[1024];
         try
         {
@@ -299,12 +268,13 @@ public sealed class GamepadServer : IDisposable
                 if (result.MessageType != WebSocketMessageType.Text) continue;
 
                 var json = Encoding.UTF8.GetString(buf, 0, result.Count);
-                ProcessMessage(json);
+                ProcessMessage(ws, json);
             }
         }
         catch { /* disconnected */ }
         finally
         {
+            _mirrorClients.TryRemove(ws, out _);
             try
             {
                 if (ws.State == WebSocketState.Open)
@@ -315,7 +285,86 @@ public sealed class GamepadServer : IDisposable
         }
     }
 
-    private void ProcessMessage(string json)
+    // ---- Delta frame broadcast ----
+
+    private Task? _deltaBroadcastTask;
+    private CancellationTokenSource? _deltaCts;
+
+    private void EnsureDeltaBroadcast(CancellationToken ct)
+    {
+        // Already running
+        if (_deltaBroadcastTask != null && !_deltaBroadcastTask.IsCompleted) return;
+
+        _deltaCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _deltaBroadcastTask = Task.Run(() => DeltaBroadcastLoop(_deltaCts.Token), _deltaCts.Token);
+    }
+
+    private async Task DeltaBroadcastLoop(CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        double nextFrame = 0;
+        const double frameInterval = 1000.0 / 30.0; // 30 fps delta stream
+
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                double now = sw.Elapsed.TotalMilliseconds;
+                if (now < nextFrame)
+                {
+                    await Task.Delay(Math.Max(1, (int)(nextFrame - now)), ct);
+                }
+                nextFrame = Math.Max(nextFrame + frameInterval, sw.Elapsed.TotalMilliseconds);
+
+                // Only broadcast if there are mirror clients
+                if (_mirrorClients.IsEmpty) continue;
+
+                var buffer = _engine.GetBackBuffer();
+                if (buffer == null) continue;
+
+                // Encode delta
+                byte[] payload;
+                try
+                {
+                    payload = _deltaEncoder.Encode(buffer);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                // Send to all mirror clients
+                var segment = new ArraySegment<byte>(payload);
+                var deadSockets = new List<WebSocket>();
+
+                foreach (var kvp in _mirrorClients)
+                {
+                    var ws = kvp.Key;
+                    try
+                    {
+                        if (ws.State == WebSocketState.Open)
+                            await ws.SendAsync(segment, WebSocketMessageType.Binary, true, ct);
+                        else
+                            deadSockets.Add(ws);
+                    }
+                    catch
+                    {
+                        deadSockets.Add(ws);
+                    }
+                }
+
+                // Cleanup dead sockets
+                foreach (var ws in deadSockets)
+                {
+                    _mirrorClients.TryRemove(ws, out _);
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch { /* ignore */ }
+    }
+
+    private void ProcessMessage(WebSocket ws, string json)
     {
         try
         {
@@ -346,6 +395,25 @@ public sealed class GamepadServer : IDisposable
                     if (btn == "a") _engine.SetTurboA(active);
                     else if (btn == "b") _engine.SetTurboB(active);
                 }
+            }
+            else if (type == "mirror")
+            {
+                bool active = root.GetProperty("active").GetBoolean();
+                if (active)
+                {
+                    _mirrorClients[ws] = true;
+                    // Force a full frame for new mirror client
+                    _deltaEncoder.Reset();
+                }
+                else
+                {
+                    _mirrorClients.TryRemove(ws, out _);
+                }
+            }
+            else if (type == "keyframe")
+            {
+                // Client requests a full keyframe (e.g. after reconnect or frame skip)
+                _deltaEncoder.Reset();
             }
         }
         catch

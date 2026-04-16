@@ -4,29 +4,31 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:image/image.dart' as img;
 
+import 'delta_encoder.dart';
 import 'nez_engine.dart';
 import 'web_gamepad_html.dart';
 
 /// HTTP + WebSocket server for remote gamepad control and frame streaming.
-/// Frames are pushed as binary JPEG via the same WebSocket (no separate MJPEG).
+/// Mirror mode uses the incremental delta protocol over WebSocket binary frames.
 class GamepadServer {
   HttpServer? _server;
   final NezEngine _engine;
+  final DeltaEncoder _deltaEncoder;
   final List<_WsClient> _clients = [];
   Timer? _frameTimer;
   String? _localIp;
 
-  // Pre-allocated encoder for speed
-  Uint8List? _lastJpeg;
-  bool _encoding = false;
-
   static const int port = 8080;
-  static const int _frameIntervalMs = 50; // ~20fps mirror
-  static const int _jpegQuality = 60; // balance quality vs speed
+  static const int _frameIntervalMs = 33; // ~30fps delta stream
 
-  GamepadServer(this._engine);
+  GamepadServer(this._engine)
+      : _deltaEncoder = DeltaEncoder(
+          width: _engine.screenWidth,
+          height: _engine.screenHeight,
+          blockSize: 8,
+          pixelFormat: DeltaEncoder.pixelFormatRgba32,
+        );
 
   bool get isRunning => _server != null;
   String? get localIp => _localIp;
@@ -160,7 +162,14 @@ class GamepadServer {
       } else if (type == 'mirror') {
         // Client requests frame streaming
         client.wantsMirror = msg['active'] as bool? ?? true;
+        if (client.wantsMirror) {
+          // Force a full keyframe for new mirror client
+          _deltaEncoder.reset();
+        }
         debugPrint('NEZ GamepadServer: client mirror=${client.wantsMirror}');
+      } else if (type == 'keyframe') {
+        // Client requests a full keyframe (e.g. after reconnect)
+        _deltaEncoder.reset();
       }
     } catch (e) {
       debugPrint('NEZ GamepadServer: bad message: $e');
@@ -168,39 +177,33 @@ class GamepadServer {
   }
 
   void _pushFrames() {
-    if (_encoding) return; // Skip if previous encode still running
     final hasMirrorClients = _clients.any((c) => c.wantsMirror);
     if (!hasMirrorClients) return;
 
     final rgba = _engine.lastRgbaFrame;
     if (rgba == null) return;
 
-    _encoding = true;
+    // Encode delta (synchronous, fast — no JPEG encoding)
+    Uint8List payload;
+    try {
+      payload = _deltaEncoder.encode(rgba);
+    } catch (_) {
+      return;
+    }
 
-    // Encode JPEG in compute isolate to avoid blocking game loop
-    final w = _engine.screenWidth;
-    final h = _engine.screenHeight;
-    compute(_encodeJpeg, _JpegParams(w, h, Uint8List.fromList(rgba))).then((jpeg) {
-      _encoding = false;
-      if (jpeg == null) return;
-      _lastJpeg = jpeg;
-
-      final toRemove = <_WsClient>[];
-      for (final c in _clients) {
-        if (!c.wantsMirror) continue;
-        try {
-          c.ws.add(jpeg);
-        } catch (_) {
-          toRemove.add(c);
-        }
+    final toRemove = <_WsClient>[];
+    for (final c in _clients) {
+      if (!c.wantsMirror) continue;
+      try {
+        c.ws.add(payload);
+      } catch (_) {
+        toRemove.add(c);
       }
-      for (final c in toRemove) {
-        _clients.remove(c);
-        try { c.ws.close(); } catch (_) {}
-      }
-    }).catchError((_) {
-      _encoding = false;
-    });
+    }
+    for (final c in toRemove) {
+      _clients.remove(c);
+      try { c.ws.close(); } catch (_) {}
+    }
   }
 
   static Future<String?> _getLocalIp() async {
@@ -251,25 +254,4 @@ class _WsClient {
   final WebSocket ws;
   bool wantsMirror;
   _WsClient(this.ws, {required this.wantsMirror});
-}
-
-class _JpegParams {
-  final int w, h;
-  final Uint8List rgba;
-  _JpegParams(this.w, this.h, this.rgba);
-}
-
-Uint8List? _encodeJpeg(_JpegParams p) {
-  try {
-    final image = img.Image.fromBytes(
-      width: p.w,
-      height: p.h,
-      bytes: p.rgba.buffer,
-      format: img.Format.uint8,
-      numChannels: 4,
-    );
-    return Uint8List.fromList(img.encodeJpg(image, quality: 90));
-  } catch (_) {
-    return null;
-  }
 }

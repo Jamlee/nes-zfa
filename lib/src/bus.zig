@@ -3,10 +3,16 @@ const mapper_mod = @import("./mappers/mapper.zig");
 const NROM = @import("./mappers/nrom.zig").NROM;
 const MMC1 = @import("./mappers/mmc1.zig").MMC1;
 const UxROM = @import("./mappers/UxROM.zig");
+const CNROM = @import("./mappers/cnrom.zig");
+const MMC3 = @import("./mappers/mmc3.zig");
+const AxROM = @import("./mappers/axrom.zig");
+const Mapper40 = @import("./mappers/mapper40.zig");
+const Mapper225 = @import("./mappers/mapper225.zig");
 const std = @import("std");
 const Gamepad = @import("./gamepad.zig");
 
 const PPU = @import("./ppu/ppu.zig").PPU;
+const CPU = @import("./cpu.zig").CPU;
 const MapperKind = mapper_mod.MapperKind;
 const Mapper = mapper_mod.Mapper;
 const Allocator = std.mem.Allocator;
@@ -60,6 +66,7 @@ pub const NESBus = struct {
     mapper: *Mapper,
     apu: *APU,
     ppu: *PPU,
+    cpu: *CPU,
     cart: *Cart,
     allocator: Allocator,
     controller: *Gamepad,
@@ -129,7 +136,7 @@ pub const NESBus = struct {
     }
 
     /// Create a mapper based on the cart's configuration.
-    fn createMapper(allocator: Allocator, cart: *Cart, ppu: *PPU) !*Mapper {
+    fn createMapper(allocator: Allocator, cart: *Cart, ppu: *PPU, cpu: *CPU) !*Mapper {
         const kind = cart.header.getMapper();
         switch (kind) {
             .nrom => {
@@ -149,22 +156,53 @@ pub const NESBus = struct {
                 uxROM.* = UxROM.init(cart, ppu);
                 return &uxROM.mapper;
             },
+
+            .cnrom => {
+                var cnrom = try allocator.create(CNROM);
+                cnrom.* = CNROM.init(cart, ppu);
+                return &cnrom.mapper;
+            },
+
+            .mmc3 => {
+                var mmc3 = try allocator.create(MMC3);
+                mmc3.* = MMC3.init(cart, ppu, cpu);
+                return &mmc3.mapper;
+            },
+
+            .axrom => {
+                var axrom = try allocator.create(AxROM);
+                axrom.* = AxROM.init(cart, ppu);
+                return &axrom.mapper;
+            },
+
+            .mapper40 => {
+                var m40 = try allocator.create(Mapper40);
+                m40.* = Mapper40.init(cart, ppu, cpu);
+                return &m40.mapper;
+            },
+
+            .mapper225 => {
+                var m225 = try allocator.create(Mapper225);
+                m225.* = Mapper225.init(cart, ppu);
+                return &m225.mapper;
+            },
         }
     }
 
     /// Create a new Bus.
     /// Both `cart` and `ppu` are non-owning pointers.
-    pub fn init(allocator: Allocator, cart: *Cart, apu: *APU, ppu: *PPU, controller: *Gamepad, controller2: *Gamepad) !Self {
+    pub fn init(allocator: Allocator, cart: *Cart, apu: *APU, ppu: *PPU, cpu: *CPU, controller: *Gamepad, controller2: *Gamepad) !Self {
         return .{
             .allocator = allocator,
             .cart = cart,
             .ppu = ppu,
             .apu = apu,
+            .cpu = cpu,
             .bus = .{
                 .readFn = busRead,
                 .writeFn = busWrite,
             },
-            .mapper = try createMapper(allocator, cart, ppu),
+            .mapper = try createMapper(allocator, cart, ppu, cpu),
             .controller = controller,
             .controller2 = controller2,
         };
@@ -185,6 +223,31 @@ pub const NESBus = struct {
             .UxROM => {
                 const uxROM: *UxROM = @fieldParentPtr("mapper", self.mapper);
                 self.allocator.destroy(uxROM);
+            },
+
+            .cnrom => {
+                const cnrom: *CNROM = @fieldParentPtr("mapper", self.mapper);
+                self.allocator.destroy(cnrom);
+            },
+
+            .mmc3 => {
+                const mmc3: *MMC3 = @fieldParentPtr("mapper", self.mapper);
+                self.allocator.destroy(mmc3);
+            },
+
+            .axrom => {
+                const axrom: *AxROM = @fieldParentPtr("mapper", self.mapper);
+                self.allocator.destroy(axrom);
+            },
+
+            .mapper40 => {
+                const m40: *Mapper40 = @fieldParentPtr("mapper", self.mapper);
+                self.allocator.destroy(m40);
+            },
+
+            .mapper225 => {
+                const m225: *Mapper225 = @fieldParentPtr("mapper", self.mapper);
+                self.allocator.destroy(m225);
             },
         }
     }
